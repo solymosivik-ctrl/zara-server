@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/zara-assistant/"
+title = "Zara AI Assistant"
+description = "A mobile-first AI assistant for Android with a futuristic conversational interface, Hungarian-ready language support, voice and text interaction surfaces, conversation history, and configurable assistant settings."
+version = "1.0.0"
+id = "artifacts/zara-assistant"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/zara-assistant/" ]
+localPort = 19628
+
+[services.development]
+run = "pnpm --filter @workspace/zara-assistant run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/zara-assistant", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/zara-assistant", "run", "serve" ]
+
+[services.env]
+PORT = "19628"
+BASE_PATH = "/zara-assistant/"

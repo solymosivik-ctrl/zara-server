@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Zara AI Assistant",
+    "slug": "zara-assistant",
+  "version": "1.0.2",
+    "extra": {
+    "zaraBundleId": "zara-2026.09.10-intent-routing-01"
+    },
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "zara-assistant",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Zara uses the microphone to turn your spoken requests into text."
+      }
+    },
+    "android": {
+      "package": "com.zara.assistant",
+      "versionCode": 3,
+      "permissions": ["RECORD_AUDIO"],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#080B14"
+      }
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Zara to use the microphone for voice input."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Zara uses your location to provide weather for your current place."
+        }
+      ],
+      "expo-notifications"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

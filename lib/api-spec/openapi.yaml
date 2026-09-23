@@ -1,0 +1,270 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: zara
+    description: Zara AI assistant operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /zara/chat:
+    post:
+      operationId: zaraChat
+      tags: [zara]
+      summary: Generate a Zara assistant response
+      description: Sends a conversation turn to the configured server-side AI provider.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZaraChatRequest"
+      responses:
+        "200":
+          description: Generated assistant response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZaraChatResponse"
+        "400":
+          description: Invalid request
+        "502":
+          description: AI provider request failed
+        "503":
+          description: AI provider is not configured
+  /zara/weather:
+    post:
+      operationId: zaraWeather
+      tags: [zara]
+      summary: Get current weather for a place
+      description: Resolves a user-provided place or coordinates and returns current weather from Open-Meteo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZaraWeatherRequest"
+      responses:
+        "200":
+          description: Current weather and today's forecast
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZaraWeatherResponse"
+        "400":
+          description: A place or valid coordinates are required
+        "502":
+          description: The weather provider could not be reached
+  /zara/transcribe:
+    post:
+      operationId: zaraTranscribe
+      tags: [zara]
+      summary: Transcribe a Zara voice recording
+      description: Converts a phone microphone recording to text using the configured server-side AI provider.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZaraTranscribeRequest"
+      responses:
+        "200":
+          description: Recognized speech
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZaraTranscribeResponse"
+        "400":
+          description: Invalid recording
+        "422":
+          description: No speech recognized
+        "502":
+          description: Speech provider request failed
+        "503":
+          description: Speech provider is not configured
+  /zara/speak:
+    post:
+      operationId: zaraSpeak
+      tags: [zara]
+      summary: Generate Zara speech audio
+      description: Converts a Zara text response to Hungarian speech through the secure server-side ElevenLabs connection.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZaraSpeakRequest"
+      responses:
+        "200":
+          description: Generated speech audio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZaraSpeakResponse"
+        "400":
+          description: Invalid speech request
+        "502":
+          description: ElevenLabs request failed
+        "503":
+          description: ElevenLabs is not configured
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    ZaraChatMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+      required:
+        - role
+        - content
+    ZaraChatRequest:
+      type: object
+      properties:
+        messages:
+          type: array
+          minItems: 1
+          maxItems: 40
+          items:
+            $ref: "#/components/schemas/ZaraChatMessage"
+        language:
+          type: string
+          enum: [en, hu]
+        responseStyle:
+          type: string
+          enum: [focused, warm, technical]
+        ownerName:
+          type: string
+          maxLength: 120
+        ownerVerified:
+          type: boolean
+      required:
+        - messages
+        - language
+        - responseStyle
+    ZaraChatResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    ZaraWeatherRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          maxLength: 400
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+      required: []
+    ZaraWeatherResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        location:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        temperatureC:
+          type: number
+        condition:
+          type: string
+        windSpeedKmh:
+          type: number
+        todayHighC:
+          type: number
+        todayLowC:
+          type: number
+        precipitationProbability:
+          type: number
+      required:
+        - message
+        - location
+        - latitude
+        - longitude
+        - temperatureC
+        - condition
+        - windSpeedKmh
+    ZaraTranscribeRequest:
+      type: object
+      properties:
+        audioBase64:
+          type: string
+        mimeType:
+          type: string
+        language:
+          type: string
+          enum: [en, hu]
+      required:
+        - audioBase64
+        - mimeType
+        - language
+    ZaraTranscribeResponse:
+      type: object
+      properties:
+        transcript:
+          type: string
+      required:
+        - transcript
+    ZaraSpeakRequest:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        language:
+          type: string
+          enum: [en, hu]
+      required:
+        - text
+        - language
+    ZaraSpeakResponse:
+      type: object
+      properties:
+        audioBase64:
+          type: string
+        mimeType:
+          type: string
+      required:
+        - audioBase64
+        - mimeType
+

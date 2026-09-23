@@ -1,0 +1,31 @@
+modules = ["nodejs-24", "python-base-3.13", "java-graalvm22.3"]
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
+
+[nix]
+channel = "stable-25_05"
+packages = ["android-tools", "gradle", "openjdk17"]
+
+[userenv]
+
+[userenv.shared]
+ELEVENLABS_VOICE_ID = "8qFFcMvm7tFmdvOmIOP5"
+ZARA_RELEASE_KEYSTORE = "/home/runner/workspace/artifacts/zara-assistant/android/credentials/zara-release.jks"
+ZARA_RELEASE_KEY_ALIAS = "zara-release"
