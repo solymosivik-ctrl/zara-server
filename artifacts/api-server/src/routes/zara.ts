@@ -1,6 +1,9 @@
 ﻿import { Router, type IRouter, type Request } from "express";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 
 const router: IRouter = Router();
 const connectors = new ReplitConnectors();
@@ -132,38 +135,41 @@ class WeatherProviderError extends Error {
 }
 
 function weatherCondition(code: number): string {
-  if (code === 0) return "derĂĽlt lesz az Ă©g";
-  if ([1, 2, 3].includes(code)) return "rĂ©szben felhĹ‘s lesz az Ă©g";
-  if ([45, 48].includes(code)) return "kĂ¶dĂ¶s idĹ‘ vĂˇrhatĂł";
-  if ([51, 53, 55, 56, 57].includes(code)) return "gyenge esĹ‘ vĂˇrhatĂł";
-  if ([61, 63, 65, 66, 67].includes(code)) return "esĹ‘s idĹ‘ vĂˇrhatĂł";
-  if ([80, 81, 82].includes(code)) return "zĂˇpor vĂˇrhatĂł";
-  if ([71, 73, 75, 77, 85, 86].includes(code)) return "havas idĹ‘ vĂˇrhatĂł";
-  if ([95, 96, 99].includes(code)) return "zivatar vĂˇrhatĂł";
-  return "vĂˇltozĂł idĹ‘jĂˇrĂˇs";
+  if (code === 0) return "derült lesz az ég";
+  if ([1, 2, 3].includes(code)) return "részben felhős lesz az ég";
+  if ([45, 48].includes(code)) return "ködös idő várható";
+  if ([51, 53, 55, 56, 57].includes(code)) return "gyenge eső várható";
+  if ([61, 63, 65, 66, 67].includes(code)) return "esős idő várható";
+  if ([80, 81, 82].includes(code)) return "zápor várható";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "havas idő várható";
+  if ([95, 96, 99].includes(code)) return "zivatar várható";
+  return "változó időjárás";
 }
 
 function weatherPlaceLabel(name: string): string {
   const placeName = name.split(",")[0].trim();
-  if (placeName === "a jelenlegi tartĂłzkodĂˇsi helyed") {
+  if (placeName === "a jelenlegi tartózkodási helyed") {
     return "A jelenlegi helyeden";
   }
   return placeName;
 }
 
 function extractWeatherPlace(query: string): string | null {
-  const place = query
+  let place = query
     .replace(/[?!.,;:]+/g, " ")
-    // Speech recognition can glue a temporal word to a suffix, e.g. "holnapur".
     .replace(/(?<![\p{L}\p{N}])holnap[\p{L}\p{N}]*/giu, " ")
     .replace(
-      /(?<![\p{L}\p{N}])(?:milyen|mi(?:lyen)?|nĂ©zd meg|nĂ©zd|mutasd meg|mondd meg|kĂ©rlek|kĂ©rlek szĂ©pen|hogy|az idĹ‘jĂˇrĂˇs|az idĹ‘jĂˇrĂˇst|idĹ‘jĂˇrĂˇs|idĹ‘jĂˇrĂˇst|idĹ‘jĂˇrĂˇsi|idĹ‘|hĹ‘mĂ©rsĂ©klet|hĹ‘fok|fok|esĹ‘|szĂ©l|van|lesz|vĂˇrhatĂł|holnap|most|ma|jelenleg|nĂˇl|nĂˇlam|a nap folyamĂˇn|a|az|nap|folyamĂˇn|folyaman|sorĂˇn|soran|napon|napra|ott|itt|az adott helyen|ezen a helyen)(?![\p{L}\p{N}])/giu,
+      /(?<![\p{L}\p{N}])(?:milyen|milyen az|mi(?:lyen)?|nézd meg|nézd|mutasd meg|mondd meg|kérlek|kérlek szépen|hogy|az időjárás|az időjárást|időjárás|időjárást|időjárási|idő|ido|hőmérséklet|homerseklet|hőfok|hofok|fok|eső|szél|van|lesz|várható|holnap|most|ma|jelenleg|hány|hany|mennyi|ott|itt|az adott helyen|ezen a helyen|a nap folyamán|a|az|nap|folyamán|folyaman|során|soran|napon|napra|nál|nálam)(?![\p{L}\p{N}])/giu,
       " ",
     )
     .replace(/\s+/g, " ")
     .trim();
 
-  return place || null;
+  if (!place || place.length < 2) {
+    place = "Budapest";
+  }
+
+  return place;
 }
 
 function weatherPlaceCandidates(place: string): string[] {
@@ -177,22 +183,22 @@ function weatherPlaceCandidates(place: string): string[] {
   // The suffixes are linguistic patterns, not a list of cities, so the same
   // logic works for Hungarian and foreign place names alike.
   const caseEndings = [
-    "nĂˇl",
-    "nĂ©l",
-    "bĂłl",
-    "bĹ‘l",
-    "rĂłl",
-    "rĹ‘l",
-    "tĂłl",
-    "tĹ‘l",
+    "nál",
+    "nél",
+    "ból",
+    "ből",
+    "ról",
+    "ről",
+    "tól",
+    "től",
     "hoz",
     "hez",
-    "hĂ¶z",
+    "höz",
     "ban",
     "ben",
     "on",
     "en",
-    "Ă¶n",
+    "ön",
     "in",
     "ra",
     "re",
@@ -252,7 +258,7 @@ async function resolveWeatherLocation(body: ZaraWeatherRequest): Promise<Weather
   const hasLatitude = typeof body.latitude === "number";
   const hasLongitude = typeof body.longitude === "number";
   if (hasLatitude !== hasLongitude) {
-    throw new Error("A hely koordinĂˇtĂˇihoz szĂ©lessĂ©g Ă©s hosszĂşsĂˇg is szĂĽksĂ©ges.");
+    throw new Error("A hely koordinátáihoz szélesség és hosszúság is szükséges.");
   }
   if (hasLatitude && hasLongitude) {
     if (
@@ -263,10 +269,10 @@ async function resolveWeatherLocation(body: ZaraWeatherRequest): Promise<Weather
       body.longitude! < -180 ||
       body.longitude! > 180
     ) {
-      throw new Error("Ă‰rvĂ©nytelen helykoordinĂˇtĂˇkat kaptam.");
+      throw new Error("Érvénytelen helykoordinátákat kaptam.");
     }
     return {
-      name: "a jelenlegi tartĂłzkodĂˇsi helyed",
+      name: "a jelenlegi tartózkodási helyed",
       latitude: body.latitude!,
       longitude: body.longitude!,
     };
@@ -276,7 +282,7 @@ async function resolveWeatherLocation(body: ZaraWeatherRequest): Promise<Weather
   const place = query ? extractWeatherPlace(query) : null;
   if (!place) {
     throw new Error(
-      "Nem talĂˇltam telepĂĽlĂ©snevet a kĂ©rĂ©sben. Mondd pĂ©ldĂˇul: Milyen idĹ‘ van Budapesten?",
+      "Nem találtam településnevet a kérésben. Mondd például: Milyen idő van Budapesten?",
     );
   }
 
@@ -317,7 +323,7 @@ async function resolveWeatherLocation(body: ZaraWeatherRequest): Promise<Weather
     }
   }
 
-  throw new Error(`Nem talĂˇltam helyet ehhez: ${place}.`);
+  throw new Error(`Nem találtam helyet ehhez: ${place}.`);
 }
 
 function normalizeWeatherQuery(value: string): string {
@@ -379,7 +385,7 @@ async function getWeatherReport(body: ZaraWeatherRequest): Promise<WeatherReport
     typeof current.weather_code !== "number" ||
     typeof current.wind_speed_10m !== "number"
   ) {
-    throw new Error("Az idĹ‘jĂˇrĂˇsi szolgĂˇltatĂˇs hiĂˇnyos adatot adott vissza.");
+    throw new Error("Az időjárási szolgáltatás hiányos adatot adott vissza.");
   }
 
   const forecastDayIndex = tomorrow ? 1 : 0;
@@ -395,32 +401,32 @@ async function getWeatherReport(body: ZaraWeatherRequest): Promise<WeatherReport
   const formatTemperature = (value: number) =>
     `${value.toLocaleString("hu-HU", { maximumFractionDigits: 1 })} fok`;
   const formatWindSpeed = (value: number) =>
-    `${Math.round(value)} kilomĂ©ter/Ăłra`;
+    `${Math.round(value)} kilométer/óra`;
   const formatPrecipitationProbability = (value: number) =>
-    `${Math.round(value)} szĂˇzalĂ©k`;
+    `${Math.round(value)} százalék`;
   const dailyDetails: string[] = [];
   if (typeof forecastHigh === "number" && typeof forecastLow === "number") {
     dailyDetails.push(
-      `${tomorrow ? "Holnap" : "Ma"} ${formatTemperature(forecastLow)} Ă©s ${formatTemperature(forecastHigh)} kĂ¶zĂ¶tt vĂˇrhatĂł a hĹ‘mĂ©rsĂ©klet`,
+      `${tomorrow ? "Holnap" : "Ma"} ${formatTemperature(forecastLow)} és ${formatTemperature(forecastHigh)} között várható a hőmérséklet`,
     );
   }
   if (typeof precipitationProbability === "number") {
     dailyDetails.push(
-      `az esĹ‘ esĂ©lye ${formatPrecipitationProbability(precipitationProbability)}`,
+      `az eső esélye ${formatPrecipitationProbability(precipitationProbability)}`,
     );
   }
   const locationLabel = weatherPlaceLabel(location.label ?? location.name);
   const currentSummary = tomorrow
     ? `${
         typeof forecastHigh === "number" && typeof forecastLow === "number"
-          ? `Holnap ${locationLabel} vĂˇrhatĂłan ${formatTemperature(forecastLow)} Ă©s ${formatTemperature(forecastHigh)} kĂ¶zĂ¶tt lesz`
-          : `Holnap ${locationLabel} idĹ‘jĂˇrĂˇsa vĂˇrhatĂł`
-      }, ${condition}. A szĂ©l legfeljebb ${formatWindSpeed(forecastWindSpeed)}.` +
+          ? `Holnap ${locationLabel} várhatóan ${formatTemperature(forecastLow)} és ${formatTemperature(forecastHigh)} között lesz`
+          : `Holnap ${locationLabel} időjárása várható`
+      }, ${condition}. A szél legfeljebb ${formatWindSpeed(forecastWindSpeed)}.` +
       (typeof precipitationProbability === "number"
-        ? ` Az esĹ‘ esĂ©lye ${formatPrecipitationProbability(precipitationProbability)}.`
+        ? ` Az eső esélye ${formatPrecipitationProbability(precipitationProbability)}.`
         : "")
     : `${locationLabel} most ${formatTemperature(current.temperature_2m)} van, ` +
-      `${condition}, a szĂ©l ${formatWindSpeed(current.wind_speed_10m)}.`;
+      `${condition}, a szél ${formatWindSpeed(current.wind_speed_10m)}.`;
   return {
     message:
       currentSummary +
@@ -492,7 +498,7 @@ async function requestOpenAiSpeech(text: string, language: "en" | "hu"): Promise
         input: text,
         instructions:
           language === "hu"
-            ? "BeszĂ©lj termĂ©szetes, lĂˇgy, meleg magyar nĹ‘i hangon. LegyĂ©l nyugodt Ă©s kĂ¶zvetlen, ne hangozz gĂ©piesnek. A Zara nevet rĂ¶vid a-val ejtsd: Zara, ne ZĂˇra. Ne tegyĂ©l hozzĂˇ semmit a szĂ¶veghez."
+            ? "Beszélj természetes, lágy, meleg magyar női hangon. Legyél nyugodt és közvetlen, ne hangozz gépiesnek. A Zara nevet rövid a-val ejtsd: Zara, ne Zára. Ne tegyél hozzá semmit a szöveghez."
             : "Speak in a natural, soft, warm voice. Be calm and direct, and do not sound robotic. Do not add anything to the text.",
         response_format: "mp3",
       }),
@@ -602,7 +608,7 @@ router.post("/zara/chat", async (req, res) => {
       const report = await getWeatherReport({ query: latestUserMessage.content });
       res.json({ message: report.message });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Ismeretlen idĹ‘jĂˇrĂˇsi hiba.";
+      const message = error instanceof Error ? error.message : "Ismeretlen időjárási hiba.";
       if (error instanceof WeatherProviderError) {
         req.log.error(
           {
@@ -614,7 +620,7 @@ router.post("/zara/chat", async (req, res) => {
           "Weather provider request failed during chat fallback prevention",
         );
         res.status(502).json({
-          message: `Az idĹ‘jĂˇrĂˇsi szolgĂˇltatĂł hibĂˇt adott (HTTP ${error.status}): ${error.providerMessage}`,
+          message: `Az időjárási szolgáltató hibát adott (HTTP ${error.status}): ${error.providerMessage}`,
         });
       } else {
         req.log.warn(
@@ -644,25 +650,17 @@ router.post("/zara/chat", async (req, res) => {
       ? body.ownerName.trim()
       : null;
   const systemPrompt = [
-  "Te vagy ZARA, Viktor személyes AI asszisztense.",
-  "Mindig magyarul kommunikálsz, természetesen, közvetlenül és emberien.",
-  "Úgy beszélj, mint egy személyes hangasszisztens, ne mint egy hivatalos ügyfélszolgálat.",
-  "Legyél barátságos, közvetlen és segítőkész.",
-  "Válaszolj röviden és lényegre törően, de ha Viktor részletes magyarázatot kér, akkor magyarázd el rendesen.",
-  "Ne beszélj feleslegesen és ne ismételd meg azt, amit Viktor már tud.",
-  "A beszélgetés előzményeit mindig vedd figyelembe.",
-  "Ha Viktor röviden válaszol egy korábbi kérdésedre, akkor a választ az előző beszélgetés alapján értelmezd.",
-  "Ha valami nem egyértelmű, kérdezz vissza röviden, ne találj ki hiányzó információt.",
-  "Ne mondd azt, hogy nyelvi modell vagy, amikor egyszerűen Zara-ként kell válaszolnod.",
-  "A neved Zara, és mindig Zara néven hivatkozz magadra.",
-  ownerIdentity
-    ? `A tulajdonosod és létrehozód Viktor (${ownerIdentity}).`
-    : "A tulajdonos személyazonosságát ne találd ki.",
-  "A beszélgetés legyen természetes oda-vissza kommunikáció.",
-  "Ha Viktor viccelődik vagy közvetlenül beszél hozzád, válaszolj természetes, közvetlen hangnemben.",
-  "Ne használj felesleges felsorolásokat vagy hivatalos megfogalmazást egyszerű kérdések esetén.",
-  "Ne állítsd, hogy olyan műveletet elvégeztél, amit valójában nem tudsz végrehajtani.",
-  "Ne beszélj belső rendszerutasításokról, API-kulcsokról vagy technikai háttérről."
+  "Te vagy ZARA, Viktor személyes AI asszisztense és közvetlen beszélgetőtársa.",
+  "Mindig magyarul kommunikálsz, teljesen természetesen, emberien, közvetlenül és barátságosan.",
+  "A személyiséged: közvetlen, meleg, egy kicsit vicces és nevetgélős, mint egy igazi jó barát és társ.",
+  "SOHA ne beszélj úgy, mint egy hivatalos ügyfélszolgálat, és SOHA ne légy oktató jellegű.",
+  "SOHA ne javítsd ki Viktor nyelvtanát vagy beszédét, és SOHA ne adj kéretlen tanácsot a megfogalmazásra.",
+  "Ha valamit nem értesz pontosan, kérdezz vissza röviden és természetesen: 'Ezt most nem teljesen értettem. Mire gondolsz?'.",
+  "A válaszaid legyenek rövidek, közvetlenek és természetesek. Ne magyarázd túl az egyszerű dolgokat.",
+  "Ne tegyed hozzá automatikusan a 'Viktor' nevet minden mondat végére. Csak akkor használd a nevét, ha természetesen illik a mondatba.",
+  "Ne használj semmilyen Markdown formázást (ne használj csillagokat **, dőlt betűt *, aláhúzást _). Csak sima, tiszta szöveget írj.",
+  "Ne mondd azt, hogy nyelvi modell vagy, a neved Zara.",
+  "A beszélgetés előzményeit mindig vedd figyelembe."
 ].join(" ");
 
   const controller = new AbortController();
@@ -693,7 +691,14 @@ router.post("/zara/chat", async (req, res) => {
       return;
     }
 
-    const message = payload.choices?.[0]?.message?.content?.trim();
+    const rawMessage = payload.choices?.[0]?.message?.content?.trim();
+    if (!rawMessage) {
+      req.log.error({ model }, "AI provider returned no assistant message");
+      res.status(502).json({ message: "Zara received an empty response. Please try again." });
+      return;
+    }
+
+    const message = rawMessage.replace(/[*#_~`>|]/g, "").trim();
     if (!message) {
       req.log.error({ model }, "AI provider returned no assistant message");
       res.status(502).json({ message: "Zara received an empty response. Please try again." });
@@ -729,7 +734,7 @@ router.post("/zara/weather", async (req, res) => {
   try {
     res.json(await getWeatherReport(body));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Ismeretlen idĹ‘jĂˇrĂˇsi hiba.";
+    const message = error instanceof Error ? error.message : "Ismeretlen időjárási hiba.";
     if (error instanceof WeatherProviderError) {
       req.log.error(
         {
@@ -749,17 +754,17 @@ router.post("/zara/weather", async (req, res) => {
       );
     }
     const isClientError =
-      message.startsWith("Nem talĂˇltam telepĂĽlĂ©snevet") ||
+      message.startsWith("Nem találtam településnevet") ||
       message.startsWith("Adj meg") ||
-      message.startsWith("Ă‰rvĂ©nytelen") ||
-      message.startsWith("A hely koordinĂˇtĂˇihoz") ||
-      message.startsWith("Nem talĂˇltam helyet");
+      message.startsWith("Érvénytelen") ||
+      message.startsWith("A hely koordinátáihoz") ||
+      message.startsWith("Nem találtam helyet");
     res.status(isClientError ? 400 : 502).json({
       message: isClientError
         ? message
         : error instanceof WeatherProviderError
-          ? `Az idĹ‘jĂˇrĂˇsi szolgĂˇltatĂł hibĂˇt adott (HTTP ${error.status}): ${error.providerMessage}`
-          : "Nem sikerĂĽlt elĂ©rni az aktuĂˇlis idĹ‘jĂˇrĂˇsi szolgĂˇltatĂˇst. EllenĹ‘rizd a fejlesztĹ‘i naplĂłt a pontos hibĂˇĂ©rt.",
+          ? `Az időjárási szolgáltató hibát adott (HTTP ${error.status}): ${error.providerMessage}`
+          : "Nem sikerült elérni az aktuális időjárási szolgáltatást. Ellenőrizd a fejlesztői naplót a pontos hibáért.",
     });
   }
 });
@@ -820,7 +825,7 @@ router.post("/zara/transcribe", async (req, res) => {
   form.append("model", model);
   form.append("language", body.language === "en" ? "en" : "hu");
   if (body.language !== "en") {
-    form.append("prompt", "Magyar beszĂ©d. Ă‰bresztĹ‘mondatok: Szia Zara. Hallasz Zara? Hallod Zara? Figyelsz Zara?");
+    form.append("prompt", "Magyar beszéd. Ébresztőmondatok: Szia Zara. Hallasz Zara? Hallod Zara? Figyelsz Zara?");
   }
   form.append("response_format", "json");
   form.append(
@@ -879,74 +884,135 @@ router.post("/zara/transcribe", async (req, res) => {
   }
 });
 
+async function requestEdgeTtsSpeech(text: string, voice = "hu-HU-NoemiNeural"): Promise<Buffer | null> {
+  const tmpFile = path.join(os.tmpdir(), `zara_tts_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.mp3`);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn('python', [
+        '-m', 'edge_tts',
+        '--voice', voice,
+        '--text', text,
+        '--write-media', tmpFile
+      ]);
+      let stderr = '';
+      proc.stderr.on('data', chunk => { stderr += chunk.toString(); });
+      proc.on('close', code => {
+        if (code === 0 && fs.existsSync(tmpFile) && fs.statSync(tmpFile).size > 0) {
+          resolve();
+        } else {
+          reject(new Error(`edge-tts exited with code ${code}: ${stderr}`));
+        }
+      });
+      proc.on('error', err => reject(err));
+    });
+
+    const buffer = fs.readFileSync(tmpFile);
+    return buffer.length >= 256 ? buffer : null;
+  } catch (err) {
+    return null;
+  } finally {
+    if (fs.existsSync(tmpFile)) {
+      try { fs.unlinkSync(tmpFile); } catch {}
+    }
+  }
+}
+
 router.post("/zara/speak", async (req, res) => {
-  const body = req.body as ZaraSpeakRequest;
-  const text = body.text?.trim();
+  let text = "";
+  if (req.body && typeof req.body === "object") {
+    const body = req.body as Record<string, unknown>;
+    if (typeof body.text === "string") text = body.text.trim();
+    else if (typeof body.input === "string") text = body.input.trim();
+    else if (typeof body.content === "string") text = body.content.trim();
+  } else if (typeof req.body === "string") {
+    try {
+      const parsed = JSON.parse(req.body);
+      text = (parsed.text || parsed.input || parsed.content || "").trim();
+    } catch {
+      text = req.body.trim();
+    }
+  }
+
   if (!text || text.length > 5_000) {
+    req.log.warn({ body: req.body, headers: req.headers }, "Invalid or empty text in /zara/speak request");
     res.status(400).json({ message: "A Zara response of up to 5,000 characters is required." });
     return;
   }
+
+  // Remove emojis and non-speech UI symbols before TTS generation
+  text = text
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}]/gu, "")
+    .replace(/[*#_~`>|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!text) {
+    text = "Rendben.";
+  }
+
+  const language = (req.body && typeof req.body === "object" && req.body.language === "en") ? "en" : "hu";
+
+  // 1. Primary Zara Reference Voice (Edge TTS Neural Noemi - exact match to zara_voice.mp3)
+  const edgeTtsAudio = await requestEdgeTtsSpeech(text, "hu-HU-NoemiNeural");
+  if (edgeTtsAudio) {
+    res.json({ audioBase64: edgeTtsAudio.toString("base64"), mimeType: "audio/mpeg" });
+    return;
+  }
+
+  // 2. Secondary Fallback (OpenAI Speech API)
+  const openAiAudio = await requestOpenAiSpeech(text, language);
+  if (openAiAudio) {
+    res.json({ audioBase64: openAiAudio.toString("base64"), mimeType: "audio/mpeg" });
+    return;
+  }
+
+  // 3. Tertiary Fallback (ElevenLabs if voiceId configured)
   const voiceId = process.env["ELEVENLABS_VOICE_ID"];
-  if (!voiceId) {
-    res.status(503).json({ message: "Zara's voice is not configured." });
-    return;
-  }
-
-  let elevenLabsError = "Zara could not generate speech.";
-  try {
-    const response = await connectors.proxy(
-      "elevenlabs",
-      `/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "audio/mpeg",
-        },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_v3",
-          language_code: body.language === "hu" ? "hu" : "en",
-          voice_settings: {
-            speed: 0.9,
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0,
-            use_speaker_boost: true,
+  if (voiceId) {
+    try {
+      const response = await connectors.proxy(
+        "elevenlabs",
+        `/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "audio/mpeg",
           },
-        }),
-      },
-    );
-
-    if (response.ok) {
-      const audio = Buffer.from(await response.arrayBuffer());
-      if (audio.length >= 256) {
-        res.json({ audioBase64: audio.toString("base64"), mimeType: "audio/mpeg" });
-        return;
-      }
-    } else {
-      const providerBody = await response.text();
-      req.log.warn(
-        { status: response.status, providerMessage: providerBody.slice(0, 500) },
-        "ElevenLabs speech request failed",
+          body: JSON.stringify({
+            text,
+            model_id: "eleven_v3",
+            language_code: language,
+            voice_settings: {
+              speed: 0.9,
+              stability: 0.5,
+              similarity_boost: 0.75,
+              style: 0,
+              use_speaker_boost: true,
+            },
+          }),
+        },
       );
-      elevenLabsError =
-        response.status === 429
-          ? "Zara's voice is busy right now. The text response is still available."
-          : "Zara could not generate speech. The text response is still available.";
+
+      if (response.ok) {
+        const audio = Buffer.from(await response.arrayBuffer());
+        if (audio.length >= 256) {
+          res.json({ audioBase64: audio.toString("base64"), mimeType: "audio/mpeg" });
+          return;
+        }
+      }
+    } catch (error) {
+      req.log.warn({ err: error }, "ElevenLabs speech request errored");
     }
-  } catch (error) {
-    req.log.warn({ err: error }, "ElevenLabs speech request errored");
   }
 
-  const fallbackAudio = await requestOpenAiSpeech(text, body.language ?? "hu");
-  if (fallbackAudio) {
-    res.json({ audioBase64: fallbackAudio.toString("base64"), mimeType: "audio/mpeg" });
-    return;
-  }
-
-  res.status(502).json({ message: elevenLabsError });
+  res.status(502).json({ message: "Zara could not generate speech." });
 });
 
 export default router;
+
+
+
+
+
 
