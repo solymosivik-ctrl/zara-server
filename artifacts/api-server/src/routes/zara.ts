@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { tts as generateEdgeTts } from "edge-tts";
 
 const router: IRouter = Router();
 const connectors = new ReplitConnectors();
@@ -885,6 +886,15 @@ router.post("/zara/transcribe", async (req, res) => {
 });
 
 async function requestEdgeTtsSpeech(text: string, voice = "hu-HU-NoemiNeural"): Promise<Buffer | null> {
+  try {
+    const audioBuffer = await generateEdgeTts(text, { voice });
+    if (audioBuffer && audioBuffer.length >= 256) {
+      return Buffer.from(audioBuffer);
+    }
+  } catch {
+    // fallback to CLI spawn if npm edge-tts fails
+  }
+
   const tmpFile = path.join(os.tmpdir(), `zara_tts_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.mp3`);
   for (const pyCmd of ["python3", "python"]) {
     try {
