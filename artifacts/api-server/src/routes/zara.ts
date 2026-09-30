@@ -636,8 +636,8 @@ router.post("/zara/chat", async (req, res) => {
 
   const apiKey = process.env["OPENAI_API_KEY"];
   if (!apiKey) {
-    res.status(503).json({
-      message: "Zara's AI provider is not configured. Add OPENAI_API_KEY to Replit Secrets.",
+    res.json({
+      message: "Szia Viktor! A szerverhez sikeresen kapcsolódtam, de a válaszadáshoz kérlek add meg az OPENAI_API_KEY környezeti változót a Render felületén.",
     });
     return;
   }
