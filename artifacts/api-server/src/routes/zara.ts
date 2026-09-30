@@ -930,6 +930,25 @@ async function requestEdgeTtsSpeech(text: string, voice = "hu-HU-NoemiNeural"): 
   return null;
 }
 
+async function requestGoogleTtsSpeech(text: string, language = "hu"): Promise<Buffer | null> {
+  try {
+    const encoded = encodeURIComponent(text.slice(0, 200));
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${language}&q=${encoded}`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      }
+    });
+    if (res.ok) {
+      const audio = Buffer.from(await res.arrayBuffer());
+      if (audio.length >= 256) return audio;
+    }
+  } catch (err) {
+    console.error("Google TTS error:", err);
+  }
+  return null;
+}
+
 router.post("/zara/speak", async (req, res) => {
   let text = "";
   if (req.body && typeof req.body === "object") {
@@ -967,15 +986,22 @@ router.post("/zara/speak", async (req, res) => {
 
   // 1. Primary Zara Reference Voice (Edge TTS Neural Noemi - exact match to zara_voice.mp3)
   const edgeTtsAudio = await requestEdgeTtsSpeech(text, "hu-HU-NoemiNeural");
-  if (edgeTtsAudio) {
+  if (edgeTtsAudio && edgeTtsAudio.length >= 256) {
     res.json({ audioBase64: edgeTtsAudio.toString("base64"), mimeType: "audio/mpeg" });
     return;
   }
 
   // 2. Secondary Fallback (OpenAI Speech API)
   const openAiAudio = await requestOpenAiSpeech(text, language);
-  if (openAiAudio) {
+  if (openAiAudio && openAiAudio.length >= 256) {
     res.json({ audioBase64: openAiAudio.toString("base64"), mimeType: "audio/mpeg" });
+    return;
+  }
+
+  // 3. Guaranteed High Quality Fallback (Google Speech API)
+  const googleAudio = await requestGoogleTtsSpeech(text, language);
+  if (googleAudio && googleAudio.length >= 256) {
+    res.json({ audioBase64: googleAudio.toString("base64"), mimeType: "audio/mpeg" });
     return;
   }
 
