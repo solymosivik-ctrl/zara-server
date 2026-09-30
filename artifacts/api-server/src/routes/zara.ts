@@ -493,21 +493,21 @@ async function requestOpenAiSpeech(text: string, language: "en" | "hu"): Promise
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env["OPENAI_TTS_MODEL"] ?? "gpt-4o-mini-tts",
-        voice: process.env["OPENAI_TTS_VOICE"] ?? "shimmer",
+        model: process.env["OPENAI_TTS_MODEL"] ?? "tts-1",
+        voice: process.env["OPENAI_TTS_VOICE"] ?? "nova",
         input: text,
-        instructions:
-          language === "hu"
-            ? "Beszélj természetes, lágy, meleg magyar női hangon. Legyél nyugodt és közvetlen, ne hangozz gépiesnek. A Zara nevet rövid a-val ejtsd: Zara, ne Zára. Ne tegyél hozzá semmit a szöveghez."
-            : "Speak in a natural, soft, warm voice. Be calm and direct, and do not sound robotic. Do not add anything to the text.",
         response_format: "mp3",
       }),
       signal: controller.signal,
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.error("OpenAI TTS error:", response.status, await response.text());
+      return null;
+    }
     const audio = Buffer.from(await response.arrayBuffer());
     return audio.length >= 256 ? audio : null;
-  } catch {
+  } catch (err) {
+    console.error("OpenAI TTS exception:", err);
     return null;
   } finally {
     clearTimeout(timeout);
@@ -886,35 +886,38 @@ router.post("/zara/transcribe", async (req, res) => {
 
 async function requestEdgeTtsSpeech(text: string, voice = "hu-HU-NoemiNeural"): Promise<Buffer | null> {
   const tmpFile = path.join(os.tmpdir(), `zara_tts_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.mp3`);
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const proc = spawn('python', [
-        '-m', 'edge_tts',
-        '--voice', voice,
-        '--text', text,
-        '--write-media', tmpFile
-      ]);
-      let stderr = '';
-      proc.stderr.on('data', chunk => { stderr += chunk.toString(); });
-      proc.on('close', code => {
-        if (code === 0 && fs.existsSync(tmpFile) && fs.statSync(tmpFile).size > 0) {
-          resolve();
-        } else {
-          reject(new Error(`edge-tts exited with code ${code}: ${stderr}`));
-        }
+  for (const pyCmd of ["python3", "python"]) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn(pyCmd, [
+          "-m", "edge_tts",
+          "--voice", voice,
+          "--text", text,
+          "--write-media", tmpFile
+        ]);
+        let stderr = "";
+        proc.stderr.on("data", chunk => { stderr += chunk.toString(); });
+        proc.on("close", code => {
+          if (code === 0 && fs.existsSync(tmpFile) && fs.statSync(tmpFile).size > 0) {
+            resolve();
+          } else {
+            reject(new Error(`${pyCmd} edge-tts exited with code ${code}: ${stderr}`));
+          }
+        });
+        proc.on("error", err => reject(err));
       });
-      proc.on('error', err => reject(err));
-    });
 
-    const buffer = fs.readFileSync(tmpFile);
-    return buffer.length >= 256 ? buffer : null;
-  } catch (err) {
-    return null;
-  } finally {
-    if (fs.existsSync(tmpFile)) {
-      try { fs.unlinkSync(tmpFile); } catch {}
+      const buffer = fs.readFileSync(tmpFile);
+      if (buffer.length >= 256) return buffer;
+    } catch {
+      // try next python command
+    } finally {
+      if (fs.existsSync(tmpFile)) {
+        try { fs.unlinkSync(tmpFile); } catch {}
+      }
     }
   }
+  return null;
 }
 
 router.post("/zara/speak", async (req, res) => {
