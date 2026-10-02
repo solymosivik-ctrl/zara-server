@@ -1,13 +1,19 @@
-import { timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
-import { RepairIncidentInputSchema, repairResultMessageHu, type RepairIncidentRecord } from "./incident-model";
+import {
+  classifyRepairIncident,
+  RepairIncidentInputSchema,
+  repairResultMessageHu,
+  type RepairIncidentRecord,
+} from "./incident-model";
 import { createRepairCandidate, type RepairCandidateResult } from "./orchestrator";
 import type { RepairIncidentStore } from "./store";
+import { z } from "zod";
 
-const RepairCandidateInputSchema = (await import("zod")).z
+const RepairCandidateInputSchema = z
   .object({
-    incidentId: (await import("zod")).z.string().uuid(),
-    patch: (await import("zod")).z.string().min(1).max(64 * 1024),
+    incidentId: z.string().uuid(),
+    patch: z.string().min(1).max(64 * 1024),
   })
   .strict();
 
@@ -131,8 +137,6 @@ export function createRepairRouter(options: RepairRouterOptions): IRouter {
       return;
     }
 
-    const { randomUUID } = await import("node:crypto");
-    const { classifyRepairIncident } = await import("./incident-model");
     const record: RepairIncidentRecord = {
       id: randomUUID(),
       createdAt: new Date().toISOString(),
@@ -233,19 +237,27 @@ export function createRepairRouter(options: RepairRouterOptions): IRouter {
           "Zara repair candidate check completed",
         );
       })
-      .catch(async () => {
+      .catch(() => {
         const failed: RepairIncidentRecord = {
           ...running,
           state: "candidate-failed",
           tests: [],
         };
-        await options.store.update(failed);
-        sendLog(
-          req,
-          "warn",
-          { event: "zara.repair.candidate", incidentId: incident.id, state: "candidate-failed" },
-          "Zara repair candidate orchestration failed",
-        );
+        void options.store
+          .update(failed)
+          .then(() =>
+            sendLog(
+              req,
+              "warn",
+              {
+                event: "zara.repair.candidate",
+                incidentId: incident.id,
+                state: "candidate-failed",
+              },
+              "Zara repair candidate orchestration failed",
+            ),
+          )
+          .catch(() => undefined);
       })
       .finally(() => {
         candidateJobActive = false;
