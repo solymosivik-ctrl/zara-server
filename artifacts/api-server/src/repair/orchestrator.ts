@@ -180,7 +180,7 @@ export const runCandidateChecks: CandidateCheckRunner = async (worktreePath) => 
 
   for (const check of CHECK_COMMANDS) {
     try {
-      const result = await runProcess("pnpm", check.args, {
+      const result = await runProcess("pnpm", [...check.args], {
         cwd: worktreePath,
         env: safeEnv,
         timeoutMs: 180_000,

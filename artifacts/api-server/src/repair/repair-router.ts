@@ -1,5 +1,6 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
+import { CreateRepairCandidateBody } from "@workspace/api-zod";
 import {
   classifyRepairIncident,
   RepairIncidentInputSchema,
@@ -8,14 +9,8 @@ import {
 } from "./incident-model";
 import { createRepairCandidate, type RepairCandidateResult } from "./orchestrator";
 import type { RepairIncidentStore } from "./store";
-import { z } from "zod";
 
-const RepairCandidateInputSchema = z
-  .object({
-    incidentId: z.string().uuid(),
-    patch: z.string().min(1).max(64 * 1024),
-  })
-  .strict();
+const RepairCandidateInputSchema = CreateRepairCandidateBody.strict();
 
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 const MAX_REPORTS_PER_MINUTE = 12;
@@ -80,6 +75,13 @@ function requireWorkerToken(
 function allowIncidentReport(req: Request, res: Response): boolean {
   const now = Date.now();
   const key = req.ip || req.socket.remoteAddress || "unknown";
+  for (const [address, count] of requestCounts) {
+    if (now >= count.resetAt) requestCounts.delete(address);
+  }
+  if (requestCounts.size >= 1024 && !requestCounts.has(key)) {
+    const oldest = requestCounts.keys().next().value;
+    if (oldest) requestCounts.delete(oldest);
+  }
   const current = requestCounts.get(key);
   if (!current || now >= current.resetAt) {
     requestCounts.set(key, { count: 1, resetAt: now + 60_000 });
@@ -156,8 +158,9 @@ export function createRepairRouter(options: RepairRouterOptions): IRouter {
         component: record.classification.component,
         confidence: record.classification.confidence,
         severity: record.classification.severity,
-        endpoint: record.input.endpoint ?? record.input.events.at(-1)?.endpoint ?? null,
-        status: record.input.status ?? record.input.events.at(-1)?.status ?? null,
+        endpoint:
+          record.input.endpoint ?? record.input.events?.at(-1)?.endpoint ?? null,
+        status: record.input.status ?? record.input.events?.at(-1)?.status ?? null,
       },
       "Sanitized Zara repair incident received",
     );
@@ -194,6 +197,21 @@ export function createRepairRouter(options: RepairRouterOptions): IRouter {
       res.status(409).json({
         code: "REPAIR_CANDIDATE_ALREADY_RUNNING",
         messageHu: "Ehhez a jelentéshez már fut javításjelölt-ellenőrzés.",
+      });
+      return;
+    }
+    if (incident.classification.component !== "server-health") {
+      res.status(403).json({
+        code: "REPAIR_COMPONENT_OUT_OF_SCOPE",
+        messageHu:
+          "Az első javítási verzió kizárólag a szerver health útvonalára készíthet jelöltet.",
+      });
+      return;
+    }
+    if (candidateJobActive) {
+      res.status(409).json({
+        code: "REPAIR_JOB_BUSY",
+        messageHu: "Már fut egy javításjelölt-ellenőrzés.",
       });
       return;
     }

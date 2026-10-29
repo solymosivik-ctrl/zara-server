@@ -7,6 +7,19 @@
  */
 
 export * from './healthStatus';
+export * from './repairCandidateRequest';
+export * from './repairComponent';
+export * from './repairEndpoint';
+export * from './repairEvent';
+export * from './repairEventMethod';
+export * from './repairEventPhase';
+export * from './repairIncidentRequest';
+export * from './repairIncidentRequestMethod';
+export * from './repairIncidentRequestSource';
+export * from './repairIncidentResponse';
+export * from './repairSeverity';
+export * from './repairState';
+export * from './repairTestResult';
 export * from './zaraChatMessage';
 export * from './zaraChatMessageRole';
 export * from './zaraChatRequest';

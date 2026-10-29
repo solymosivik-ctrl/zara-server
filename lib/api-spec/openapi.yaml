@@ -79,7 +79,7 @@ paths:
         "401":
           description: Worker authentication failed
         "403":
-          description: Repair policy rejected the candidate
+          description: Incident component is outside the health-route-only repair policy
         "404":
           description: Incident does not exist
         "409":

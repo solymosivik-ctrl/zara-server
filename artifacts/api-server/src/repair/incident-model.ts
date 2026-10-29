@@ -1,48 +1,19 @@
-import { z } from "zod";
-
-const allowedEndpoints = [
-  "/api/healthz",
-  "/api/zara/chat",
-  "/api/zara/weather",
-  "/api/zara/transcribe",
-  "/api/zara/speak",
-] as const;
-
-const RepairEventSchema = z
-  .object({
-    phase: z.enum(["before", "after", "error"]),
-    endpoint: z.enum(allowedEndpoints),
-    method: z.enum(["GET", "POST"]),
-    status: z.number().int().min(100).max(599).nullable().optional(),
-    durationMs: z.number().int().min(0).max(300_000).optional(),
-  })
-  .strict();
+import {
+  CreateRepairIncidentBody,
+  type RepairIncidentRequest,
+} from "@workspace/api-zod";
 
 /**
  * The report intentionally has no free-text field. That prevents transcripts,
  * conversation content, credentials, and raw provider errors entering storage.
  */
-export const RepairIncidentInputSchema = z
-  .object({
-    source: z.enum(["mobile", "api"]).default("mobile"),
-    errorCode: z
-      .string()
-      .trim()
-      .min(1)
-      .max(64)
-      .regex(/^[a-z0-9_.:-]+$/i)
-      .transform((value) => value.toUpperCase()),
-    endpoint: z.enum(allowedEndpoints).optional(),
-    method: z.enum(["GET", "POST"]).optional(),
-    status: z.number().int().min(100).max(599).optional(),
-    durationMs: z.number().int().min(0).max(300_000).optional(),
-    appVersion: z.string().trim().max(40).regex(/^[a-z0-9.+_-]*$/i).optional(),
-    requestId: z.string().trim().max(80).regex(/^[a-z0-9_-]*$/i).optional(),
-    events: z.array(RepairEventSchema).max(20).default([]),
-  })
-  .strict();
+const repairEventSchema =
+  CreateRepairIncidentBody.shape.events!.unwrap().element.strict();
 
-export type RepairIncidentInput = z.infer<typeof RepairIncidentInputSchema>;
+export const RepairIncidentInputSchema = CreateRepairIncidentBody.extend({
+  events: repairEventSchema.array().max(20).optional(),
+}).strict();
+export type RepairIncidentInput = RepairIncidentRequest;
 
 export type RepairComponent =
   | "microphone"
@@ -117,7 +88,7 @@ export function classifyRepairIncident(
   incident: RepairIncidentInput,
 ): RepairClassification {
   const endpoint =
-    incident.endpoint ?? incident.events.at(-1)?.endpoint ?? "";
+    incident.endpoint ?? incident.events?.at(-1)?.endpoint ?? "";
   const code = incident.errorCode;
   let component: RepairComponent = "unknown";
 
@@ -146,14 +117,14 @@ export function classifyRepairIncident(
   }
 
   const base = classifications[component];
-  const status = incident.status ?? incident.events.at(-1)?.status ?? undefined;
+  const status = incident.status ?? incident.events?.at(-1)?.status ?? undefined;
   const severity =
     (status !== undefined && status >= 500) ||
     /(_FATAL|_CRASH|_TIMEOUT)$/.test(code)
       ? "high"
       : status !== undefined && status >= 400
         ? "medium"
-        : component === "unknown"
+        : component === "unknown" || component === "audio-signal"
           ? "low"
           : "medium";
 
@@ -178,7 +149,10 @@ export function repairResultMessageHu(
     return `${incident.classification.summaryHu} Elkülönített javításjelölt készült, az ellenőrzések sikerültek. A változtatás nincs élesítve.`;
   }
   if (incident.state === "candidate-failed") {
-    return `${incident.classification.summaryHu} A javításjelölt ellenőrzése nem sikerült; a jelöltet eltávolítottam, az eredeti Git-visszaállítási pont megmaradt.`;
+    if (incident.checkpointRef) {
+      return `${incident.classification.summaryHu} A javításjelölt ellenőrzése nem sikerült; a jelöltet eltávolítottam, az eredeti Git-visszaállítási pont megmaradt.`;
+    }
+    return `${incident.classification.summaryHu} A javításjelöltet a biztonsági szabály elutasította; fájlmódosítás és visszaállítási pont nem készült.`;
   }
   if (incident.state === "candidate-running") {
     return `${incident.classification.summaryHu} A javításjelölt ellenőrzése folyamatban van.`;
