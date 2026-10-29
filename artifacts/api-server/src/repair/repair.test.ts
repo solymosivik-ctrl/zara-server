@@ -230,6 +230,7 @@ describe("repair API", () => {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
   app.use(
+    "/api",
     createRepairRouter({
       store,
       workerToken: () => "unit-test-private-token",
@@ -262,7 +263,7 @@ describe("repair API", () => {
 
   it("creates a sanitized Hungarian incident report", async () => {
     await ready;
-    const response = await fetch(`${baseUrl}/repair/incidents`, {
+    const response = await fetch(`${baseUrl}/api/repair/incidents`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -285,28 +286,28 @@ describe("repair API", () => {
 
   it("rejects raw audio fields and protects candidate operations", async () => {
     await ready;
-    const rejected = await fetch(`${baseUrl}/repair/incidents`, {
+    const rejected = await fetch(`${baseUrl}/api/repair/incidents`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ errorCode: "API_FAILURE", audioBase64: "secret" }),
     });
     assert.equal(rejected.status, 400);
 
-    const oversized = await fetch(`${baseUrl}/repair/incidents`, {
+    const oversized = await fetch(`${baseUrl}/api/repair/incidents`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ errorCode: "API_FAILURE", arbitrary: "x".repeat(17_000) }),
     });
     assert.equal(oversized.status, 413);
 
-    const unauthorized = await fetch(`${baseUrl}/repair/candidates`, {
+    const unauthorized = await fetch(`${baseUrl}/api/repair/candidates`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ incidentId: "00000000-0000-4000-8000-000000000000", patch: "x" }),
     });
     assert.equal(unauthorized.status, 401);
 
-    const voiceIncidentResponse = await fetch(`${baseUrl}/repair/incidents`, {
+    const voiceIncidentResponse = await fetch(`${baseUrl}/api/repair/incidents`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -316,7 +317,7 @@ describe("repair API", () => {
       }),
     });
     const voiceIncident = (await voiceIncidentResponse.json()) as { id: string };
-    const outOfScope = await fetch(`${baseUrl}/repair/candidates`, {
+    const outOfScope = await fetch(`${baseUrl}/api/repair/candidates`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -332,13 +333,13 @@ describe("repair API", () => {
 
   it("accepts an authorized candidate request and exposes only its status", async () => {
     await ready;
-    const incidentResponse = await fetch(`${baseUrl}/repair/incidents`, {
+    const incidentResponse = await fetch(`${baseUrl}/api/repair/incidents`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ errorCode: "HEALTH_CHECK_FAILED", endpoint: "/api/healthz" }),
     });
     const incident = (await incidentResponse.json()) as { id: string };
-    const response = await fetch(`${baseUrl}/repair/candidates`, {
+    const response = await fetch(`${baseUrl}/api/repair/candidates`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -354,7 +355,7 @@ describe("repair API", () => {
     let status = body.state;
     for (let attempt = 0; attempt < 20 && status === "candidate-running"; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 10));
-      const statusResponse = await fetch(`${baseUrl}/repair/incidents/${incident.id}`, {
+      const statusResponse = await fetch(`${baseUrl}/api/repair/incidents/${incident.id}`, {
         headers: { authorization: "Bearer unit-test-private-token" },
       });
       const statusBody = (await statusResponse.json()) as { state: string };
