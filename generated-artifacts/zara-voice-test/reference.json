@@ -1,0 +1,8 @@
+{
+  "reference_sha256": "a91a67866fe5bf50d7c3a50a78a78872107754206eefc76bc2f6b08b97798e61",
+  "transcript": "Szia Viktor! Ma szép napos idő lesz, eső nem lesz kicsit fújni fog a szél és 26 fok várható!",
+  "transcript_status": "user-verified",
+  "model": "Maxdorger29/f5-tts-hungarian",
+  "revision": "b3770bed7dc5988a36bf19cc0e3497c9f5b6450b",
+  "license": "CC-BY-NC-4.0; personal/research evaluation only"
+}

@@ -1,0 +1,37 @@
+{
+  "reference_transcript_status": "automatic, not user-verified",
+  "reference_sha256": "a91a67866fe5bf50d7c3a50a78a78872107754206eefc76bc2f6b08b97798e61",
+  "trials": [
+    {
+      "name": "speed-090",
+      "text": "rendben. szia, viktor! én vagyok zara.",
+      "nfe_step": 32,
+      "speed": 0.9,
+      "seed": 42,
+      "file": "zara-onset-speed-090.wav",
+      "duration_seconds": 2.5813333333333333,
+      "peak": 0.8996283411979675
+    },
+    {
+      "name": "speed-110",
+      "text": "rendben. szia, viktor! én vagyok zara.",
+      "nfe_step": 32,
+      "speed": 1.1,
+      "seed": 42,
+      "file": "zara-onset-speed-110.wav",
+      "duration_seconds": 2.112,
+      "peak": 0.9881756901741028
+    },
+    {
+      "name": "steps-48",
+      "text": "rendben. szia, viktor! én vagyok zara.",
+      "nfe_step": 48,
+      "speed": 1.0,
+      "seed": 42,
+      "file": "zara-onset-steps-48.wav",
+      "duration_seconds": 2.3253333333333335,
+      "peak": 0.956185519695282
+    }
+  ],
+  "warning": "Local test only; not integrated into the app."
+}

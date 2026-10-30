@@ -1,0 +1,10 @@
+{
+  "text": "jó reggelt. rendben. szia, viktor! én vagyok zara.",
+  "reference_transcript_status": "automatic, not user-verified",
+  "reference_sha256": "a91a67866fe5bf50d7c3a50a78a78872107754206eefc76bc2f6b08b97798e61",
+  "file": "generated-artifacts/zara-voice-test/zara-contextual-onset.wav",
+  "duration_seconds": 3.104,
+  "original_peak": 0.7977204322814941,
+  "generation_seconds": 92.75210985100011,
+  "warning": "Context/crop experiment only; not integrated into the app."
+}

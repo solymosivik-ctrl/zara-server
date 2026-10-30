@@ -1,0 +1,39 @@
+{
+  "load_seconds": 19.8190352470001,
+  "device": "cpu",
+  "threads": 4,
+  "steps": 32,
+  "text_preparation": "NFC + lowercase",
+  "reference_transcript_status": "automatic, not human-verified",
+  "samples": [
+    {
+      "file": "zara-normalized-1.wav",
+      "text": "Szia! Zara vagyok. Miben segíthetek neked?",
+      "model_text": "szia! zara vagyok. miben segíthetek neked?",
+      "sample_rate": 24000,
+      "duration_seconds": 2.56,
+      "generation_seconds": 62.888884714999676,
+      "real_time_factor": 24.56597059179675,
+      "peak": 0.9177406430244446,
+      "clipped_fraction": 0.0,
+      "automatic_back_transcript": "Iszi a zara vagyok, miben segíthetek neked.",
+      "asr_word_error_rate": 0.3333333333333333
+    },
+    {
+      "file": "zara-normalized-2.wav",
+      "text": "Csütörtökön délután három órára beállítom az emlékeztetőt.",
+      "model_text": "csütörtökön délután három órára beállítom az emlékeztetőt.",
+      "sample_rate": 24000,
+      "duration_seconds": 4.245333333333333,
+      "generation_seconds": 83.64680320399975,
+      "real_time_factor": 19.703235679334114,
+      "peak": 1.015264630317688,
+      "clipped_fraction": 2.9444095477386933e-05,
+      "automatic_back_transcript": "Egy csütörtő köndél után három órára beállítom az emlékeztetőt.",
+      "asr_word_error_rate": 0.5714285714285714
+    }
+  ],
+  "subjective_quality": "not assessed; listening required",
+  "peak_memory_mib": 2717.63671875,
+  "verification_note": "ASR back-transcription is not proof of naturalness or speaker similarity. Reference transcript and generated audio need listening verification."
+}

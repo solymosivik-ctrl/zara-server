@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "endpoint": "/api/zara/speak",
+  "text": "Szia, Zara vagyok. Most már a saját hangomon válaszolok neked.",
+  "real_synthesis_seconds": 168.65423258700002,
+  "cache_response_seconds": 0.0028253840000616037,
+  "audio_bytes": 51308,
+  "queued_cancellation": "passed",
+  "ffprobe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "mp3",
+        "sample_rate": "24000"
+      }
+    ],
+    "format": {
+      "duration": "4.272000"
+    }
+  },
+  "note": "Does not verify physical Android playback or lock-screen behavior."
+}

@@ -1,0 +1,29 @@
+{
+  "text": "rendben. szia, viktor! én vagyok zara.",
+  "reference_transcript_status": "automatic, not user-verified",
+  "reference_sha256": "a91a67866fe5bf50d7c3a50a78a78872107754206eefc76bc2f6b08b97798e61",
+  "trials": [
+    {
+      "cfg_strength": 1.5,
+      "seed": 42,
+      "file": "zara-onset-cfg-1-5.wav",
+      "duration_seconds": 2.3253333333333335,
+      "original_peak": 0.8788537979125977
+    },
+    {
+      "cfg_strength": 2.5,
+      "seed": 42,
+      "file": "zara-onset-cfg-2-5.wav",
+      "duration_seconds": 2.3253333333333335,
+      "original_peak": 1.0296823978424072
+    },
+    {
+      "cfg_strength": 3.0,
+      "seed": 42,
+      "file": "zara-onset-cfg-3-0.wav",
+      "duration_seconds": 2.3253333333333335,
+      "original_peak": 1.09927499294281
+    }
+  ],
+  "warning": "Local listening test only; not integrated into the app."
+}

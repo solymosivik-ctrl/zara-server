@@ -1,0 +1,11 @@
+{
+  "text": "rendben. szia, viktor! én vagyok zara.",
+  "reference_transcript": "Nem sokat tudok mondani magamról, de Viktor segítségével szívesen válaszolok kérdésekre.",
+  "reference_transcript_status": "user-confirmed",
+  "reference_sha256": "a91a67866fe5bf50d7c3a50a78a78872107754206eefc76bc2f6b08b97798e61",
+  "file": "generated-artifacts/zara-voice-test/zara-confirmed-reference-transcript.mp3",
+  "duration_seconds": 2.3253333333333335,
+  "generation_seconds": 85.36934654700053,
+  "peak_before_normalization": 0.9275527000427246,
+  "warning": "Local test only; not integrated into the app."
+}

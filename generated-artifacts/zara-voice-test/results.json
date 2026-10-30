@@ -1,0 +1,35 @@
+{
+  "load_seconds": 13.307655610999973,
+  "device": "cpu",
+  "threads": 4,
+  "steps": 32,
+  "reference_transcript_status": "automatic, not human-verified",
+  "samples": [
+    {
+      "file": "zara-test-1.wav",
+      "text": "Szia! Zara vagyok. Miben segíthetek neked?",
+      "sample_rate": 24000,
+      "duration_seconds": 2.56,
+      "generation_seconds": 87.06158858200024,
+      "real_time_factor": 34.008433039843844,
+      "peak": 0.8178541660308838,
+      "clipped_fraction": 0.0,
+      "automatic_back_transcript": "A siagara vagyok liben segíthetek neked.",
+      "asr_word_error_rate": 0.5
+    },
+    {
+      "file": "zara-test-2.wav",
+      "text": "Csütörtökön délután három órára beállítom az emlékeztetőt.",
+      "sample_rate": 24000,
+      "duration_seconds": 4.245333333333333,
+      "generation_seconds": 89.74059573099976,
+      "real_time_factor": 21.138645351209117,
+      "peak": 1.0121690034866333,
+      "clipped_fraction": 2.9444095477386933e-05,
+      "automatic_back_transcript": "A sütörtököndél után három órára beállítom az emlékeztetőt.",
+      "asr_word_error_rate": 0.42857142857142855
+    }
+  ],
+  "subjective_quality": "not assessed; listening required",
+  "verification_note": "ASR back-transcription is not proof of naturalness or speaker similarity. Reference transcript and generated audio need listening verification."
+}

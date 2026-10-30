@@ -1,0 +1,17 @@
+[
+  {
+    "candidate": "period-seed-7",
+    "transcript": "Irendben Sia Viktor, én vagyok Zara.",
+    "language_probability": 1
+  },
+  {
+    "candidate": "period-seed-2026",
+    "transcript": "Irendben Sia Viktorim vagyok Zara.",
+    "language_probability": 1
+  },
+  {
+    "candidate": "comma-seed-42",
+    "transcript": "Irendben Sia Viktor, én vagyok Zara.",
+    "language_probability": 1
+  }
+]

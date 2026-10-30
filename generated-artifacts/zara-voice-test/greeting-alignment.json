@@ -1,0 +1,36 @@
+{
+  "status": "rejected",
+  "target": "Szia, Zara vagyok.",
+  "note": "ASR checks do not replace human listening.",
+  "full_transcript": "Rendben szia, zara vagyok!",
+  "word_alignment": [
+    {
+      "word": " Rendben",
+      "start": 0.0,
+      "end": 0.76,
+      "probability": 0.8919502198696136
+    },
+    {
+      "word": " szia,",
+      "start": 0.76,
+      "end": 1.02,
+      "probability": 0.6085642278194427
+    },
+    {
+      "word": " zara",
+      "start": 1.08,
+      "end": 1.28,
+      "probability": 0.7871235907077789
+    },
+    {
+      "word": " vagyok!",
+      "start": 1.28,
+      "end": 1.58,
+      "probability": 0.9846873581409454
+    }
+  ],
+  "crop_start_seconds": 0.76,
+  "crop_end_seconds": 1.6,
+  "cropped_transcript": "Sziasztok!",
+  "rejection_reason": "Cropped audio did not independently transcribe to the exact greeting."
+}

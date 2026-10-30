@@ -1,0 +1,18 @@
+{
+  "file": "Zara-Assistant-1.0.4-release-20261029T103234Z.apk",
+  "bytes": 55104836,
+  "package": "com.zara.assistant",
+  "version": "1.0.4",
+  "versionCode": 5,
+  "architectures": [
+    "arm64-v8a"
+  ],
+  "sha256": "e3cb8d058262dc916d345f4bbefee9c2cc57c7759e4fd7f9e38264f66e15f304",
+  "signingCertificateSha256": "3f7a4ea4cc5fa6acf1c6c8807ed6a7b6c330b04af9b05cd0f69605b4eebfcb56",
+  "retainedReleaseCertificateMatches": true,
+  "approvedVoiceClientEmbedded": true,
+  "apiOrigin": "https://zara-server.onrender.com",
+  "apiOriginIsDevelopment": false,
+  "installedPhoneCertificateMatch": "not verified",
+  "physicalAndroidPlaybackAndLockScreen": "not verified"
+}

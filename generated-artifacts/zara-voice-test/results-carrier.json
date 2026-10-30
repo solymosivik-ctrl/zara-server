@@ -1,0 +1,24 @@
+{
+  "load_seconds": 22.20958017799967,
+  "device": "cpu",
+  "threads": 4,
+  "steps": 32,
+  "text_preparation": "NFC + lowercase",
+  "reference_padding_ms": 0,
+  "reference_transcript_status": "automatic, not human-verified",
+  "samples": [
+    {
+      "file": "zara-carrier-1.wav",
+      "text": "Rendben. Szia, Zara vagyok.",
+      "model_text": "rendben. szia, zara vagyok.",
+      "sample_rate": 24000,
+      "duration_seconds": 1.6,
+      "generation_seconds": 68.05544566699973,
+      "real_time_factor": 42.53465354187483,
+      "peak": 1.0176043510437012,
+      "clipped_fraction": 5.208333333333334e-05
+    }
+  ],
+  "subjective_quality": "not assessed; listening required",
+  "peak_memory_mib": 2717.28515625
+}

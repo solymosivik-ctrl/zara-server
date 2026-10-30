@@ -1,0 +1,27 @@
+{
+  "load_seconds": 25.435785757000303,
+  "device": "cpu",
+  "threads": 4,
+  "steps": 32,
+  "text_preparation": "NFC + lowercase",
+  "reference_padding_ms": 700,
+  "reference_transcript_status": "automatic, not human-verified",
+  "samples": [
+    {
+      "file": "zara-greeting-1.wav",
+      "text": "Szia, Zara vagyok.",
+      "model_text": "szia, zara vagyok.",
+      "sample_rate": 24000,
+      "duration_seconds": 1.1946666666666668,
+      "generation_seconds": 184.68203526900015,
+      "real_time_factor": 154.58875720061394,
+      "peak": 0.7429530024528503,
+      "clipped_fraction": 0.0,
+      "automatic_back_transcript": "Iszi a zara vagyok!",
+      "asr_word_error_rate": 0.6666666666666666
+    }
+  ],
+  "subjective_quality": "not assessed; listening required",
+  "peak_memory_mib": 2718.2109375,
+  "verification_note": "ASR back-transcription is not proof of naturalness or speaker similarity. Reference transcript and generated audio need listening verification."
+}

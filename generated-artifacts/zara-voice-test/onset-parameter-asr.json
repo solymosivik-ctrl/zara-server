@@ -1,0 +1,17 @@
+[
+  {
+    "candidate": "speed-090",
+    "transcript": "Eren Bensia, Viktor, én vagyok zara.",
+    "language_probability": 1
+  },
+  {
+    "candidate": "speed-110",
+    "transcript": "Ilyen benszi a Viktorim vagyok zara.",
+    "language_probability": 1
+  },
+  {
+    "candidate": "steps-48",
+    "transcript": "Irendben Szia Viktor, én vagyok Zara.",
+    "language_probability": 1
+  }
+]

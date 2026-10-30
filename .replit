@@ -29,3 +29,16 @@ packages = ["android-tools", "gradle", "openjdk17"]
 ELEVENLABS_VOICE_ID = "8qFFcMvm7tFmdvOmIOP5"
 ZARA_RELEASE_KEYSTORE = "/home/runner/workspace/artifacts/zara-assistant/android/credentials/zara-release.jks"
 ZARA_RELEASE_KEY_ALIAS = "zara-release"
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 80
+
+[[ports]]
+localPort = 19628
+externalPort = 3000
+exposeLocalhost = true

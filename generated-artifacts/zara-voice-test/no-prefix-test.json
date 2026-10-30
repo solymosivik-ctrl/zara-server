@@ -1,0 +1,9 @@
+{
+  "text": "szia, viktor! én vagyok zara.",
+  "reference_transcript": "Nem sokat tudok mondani magamról, de Viktor segítségével szívesen válaszolok kérdésekre.",
+  "reference_transcript_status": "user-confirmed",
+  "file": "generated-artifacts/zara-voice-test/zara-no-prefix-test.mp3",
+  "duration_seconds": 1.7813333333333334,
+  "generation_seconds": 78.07410524700003,
+  "warning": "Local test only; no app or storage changes."
+}

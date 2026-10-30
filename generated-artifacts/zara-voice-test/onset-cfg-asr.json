@@ -1,0 +1,17 @@
+[
+  {
+    "candidate": "cfg-1-5",
+    "transcript": "Irendben Sia Viktor, én vagyok Zara.",
+    "language_probability": 1
+  },
+  {
+    "candidate": "cfg-2-5",
+    "transcript": "Irendben Sia Viktor, én vagyok Zara.",
+    "language_probability": 1
+  },
+  {
+    "candidate": "cfg-3-0",
+    "transcript": "Irendben Sia Viktor, én vagyok Zara.",
+    "language_probability": 1
+  }
+]
