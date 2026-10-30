@@ -1,0 +1,23 @@
+[project]
+name = "zara-approved-voice-runtime"
+version = "0.1.0"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "f5-tts==1.1.22",
+    "google-auth==2.62.0",
+    "google-cloud-storage==3.17.1",
+    "torch==2.8.0+cpu",
+    "torchaudio==2.8.0+cpu",
+]
+
+[tool.uv]
+environments = ["sys_platform == 'linux'"]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+torchaudio = [{ index = "pytorch-cpu", marker = "platform_system == 'Linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

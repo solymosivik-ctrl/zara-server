@@ -1,13 +1,15 @@
 ﻿import { Router, type IRouter, type Request } from "express";
-import { ReplitConnectors } from "@replit/connectors-sdk";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { tts as generateEdgeTts } from "edge-tts";
+import { ZaraSpeakBody } from "@workspace/api-zod";
+import { LocalVoiceEngine } from "../voice/engine";
+import { VoiceJobs } from "../voice/jobs";
+import { toLegacySpeakResponse } from "../voice/legacy-speak-response";
 
 const router: IRouter = Router();
-const connectors = new ReplitConnectors();
+export const zaraVoiceJobs = new VoiceJobs(new LocalVoiceEngine());
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -25,11 +27,6 @@ type ZaraChatRequest = {
 type ZaraTranscribeRequest = {
   audioBase64?: string;
   mimeType?: string;
-  language?: "en" | "hu";
-};
-
-type ZaraSpeakRequest = {
-  text?: string;
   language?: "en" | "hu";
 };
 
@@ -479,42 +476,6 @@ function detectAudioFormat(audio: Buffer): { mimeType: string; extension: string
   return null;
 }
 
-async function requestOpenAiSpeech(text: string, language: "en" | "hu"): Promise<Buffer | null> {
-  const apiKey = process.env["OPENAI_API_KEY"];
-  if (!apiKey) return null;
-
-  const baseUrl = (process.env["OPENAI_BASE_URL"] ?? "https://api.openai.com/v1").replace(/\/+$/, "");
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
-  try {
-    const response = await fetch(`${baseUrl}/audio/speech`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env["OPENAI_TTS_MODEL"] ?? "tts-1",
-        voice: process.env["OPENAI_TTS_VOICE"] ?? "nova",
-        input: text,
-        response_format: "mp3",
-      }),
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      console.error("OpenAI TTS error:", response.status, await response.text());
-      return null;
-    }
-    const audio = Buffer.from(await response.arrayBuffer());
-    return audio.length >= 256 ? audio : null;
-  } catch (err) {
-    console.error("OpenAI TTS exception:", err);
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function containsAudibleSpeech(audio: Buffer): Promise<boolean> {
   return await new Promise((resolve) => {
     const ffmpeg = spawn(
@@ -885,167 +846,55 @@ router.post("/zara/transcribe", async (req, res) => {
   }
 });
 
-async function requestEdgeTtsSpeech(text: string, voice = "hu-HU-NoemiNeural"): Promise<Buffer | null> {
-  try {
-    const audioBuffer = await generateEdgeTts(text, { voice });
-    if (audioBuffer && audioBuffer.length >= 256) {
-      return Buffer.from(audioBuffer);
-    }
-  } catch {
-    // fallback to CLI spawn if npm edge-tts fails
-  }
-
-  const tmpFile = path.join(os.tmpdir(), `zara_tts_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.mp3`);
-  for (const pyCmd of ["python3", "python"]) {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const proc = spawn(pyCmd, [
-          "-m", "edge_tts",
-          "--voice", voice,
-          "--text", text,
-          "--write-media", tmpFile
-        ]);
-        let stderr = "";
-        proc.stderr.on("data", chunk => { stderr += chunk.toString(); });
-        proc.on("close", code => {
-          if (code === 0 && fs.existsSync(tmpFile) && fs.statSync(tmpFile).size > 0) {
-            resolve();
-          } else {
-            reject(new Error(`${pyCmd} edge-tts exited with code ${code}: ${stderr}`));
-          }
-        });
-        proc.on("error", err => reject(err));
-      });
-
-      const buffer = fs.readFileSync(tmpFile);
-      if (buffer.length >= 256) return buffer;
-    } catch {
-      // try next python command
-    } finally {
-      if (fs.existsSync(tmpFile)) {
-        try { fs.unlinkSync(tmpFile); } catch {}
-      }
-    }
-  }
-  return null;
-}
-
-async function requestGoogleTtsSpeech(text: string, language = "hu"): Promise<Buffer | null> {
-  try {
-    const encoded = encodeURIComponent(text.slice(0, 200));
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${language}&q=${encoded}`;
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      }
-    });
-    if (res.ok) {
-      const audio = Buffer.from(await res.arrayBuffer());
-      if (audio.length >= 256) return audio;
-    }
-  } catch (err) {
-    console.error("Google TTS error:", err);
-  }
-  return null;
-}
-
 router.post("/zara/speak", async (req, res) => {
-  let text = "";
-  if (req.body && typeof req.body === "object") {
-    const body = req.body as Record<string, unknown>;
-    if (typeof body.text === "string") text = body.text.trim();
-    else if (typeof body.input === "string") text = body.input.trim();
-    else if (typeof body.content === "string") text = body.content.trim();
-  } else if (typeof req.body === "string") {
-    try {
-      const parsed = JSON.parse(req.body);
-      text = (parsed.text || parsed.input || parsed.content || "").trim();
-    } catch {
-      text = req.body.trim();
+  const parsed = ZaraSpeakBody.safeParse(req.body);
+  if (!parsed.success || !parsed.data.text.trim()) {
+    res.status(400).json({ message: "A felolvasható válasz 1–5000 karakter hosszú lehet." });
+    return;
+  }
+  const body = parsed.data;
+  if (body.language !== "hu") {
+    res.status(400).json({ message: "Az elfogadott Zara-hang jelenleg magyar szöveghez használható." });
+    return;
+  }
+  if (body.cancel && !body.jobId) {
+    res.status(400).json({ message: "A leállításhoz a hangkérés azonosítója szükséges." });
+    return;
+  }
+
+  try {
+    const job = body.jobId
+      ? zaraVoiceJobs.poll(body.jobId, body.text, body.language, body.cancel)
+      : zaraVoiceJobs.submit(body.text, body.language);
+    if (!job) {
+      res.status(404).json({ message: "A hangkérés nem található vagy lejárt." });
+      return;
     }
-  }
-
-  if (!text || text.length > 5_000) {
-    req.log.warn({ body: req.body, headers: req.headers }, "Invalid or empty text in /zara/speak request");
-    res.status(400).json({ message: "A Zara response of up to 5,000 characters is required." });
-    return;
-  }
-
-  // Remove emojis and non-speech UI symbols before TTS generation
-  text = text
-    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}]/gu, "")
-    .replace(/[*#_~`>|]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!text) {
-    text = "Rendben.";
-  }
-
-  const language = (req.body && typeof req.body === "object" && req.body.language === "en") ? "en" : "hu";
-
-  // 1. Primary Zara Reference Voice (Edge TTS Neural Noemi - exact match to zara_voice.mp3)
-  const edgeTtsAudio = await requestEdgeTtsSpeech(text, "hu-HU-NoemiNeural");
-  if (edgeTtsAudio && edgeTtsAudio.length >= 256) {
-    res.json({ audioBase64: edgeTtsAudio.toString("base64"), mimeType: "audio/mpeg" });
-    return;
-  }
-
-  // 2. Secondary Fallback (OpenAI Speech API)
-  const openAiAudio = await requestOpenAiSpeech(text, language);
-  if (openAiAudio && openAiAudio.length >= 256) {
-    res.json({ audioBase64: openAiAudio.toString("base64"), mimeType: "audio/mpeg" });
-    return;
-  }
-
-  // 3. Guaranteed High Quality Fallback (Google Speech API)
-  const googleAudio = await requestGoogleTtsSpeech(text, language);
-  if (googleAudio && googleAudio.length >= 256) {
-    res.json({ audioBase64: googleAudio.toString("base64"), mimeType: "audio/mpeg" });
-    return;
-  }
-
-  // 3. Tertiary Fallback (ElevenLabs if voiceId configured)
-  const voiceId = process.env["ELEVENLABS_VOICE_ID"];
-  if (voiceId) {
-    try {
-      const response = await connectors.proxy(
-        "elevenlabs",
-        `/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "audio/mpeg",
-          },
-          body: JSON.stringify({
-            text,
-            model_id: "eleven_v3",
-            language_code: language,
-            voice_settings: {
-              speed: 0.9,
-              stability: 0.5,
-              similarity_boost: 0.75,
-              style: 0,
-              use_speaker_boost: true,
-            },
-          }),
-        },
-      );
-
-      if (response.ok) {
-        const audio = Buffer.from(await response.arrayBuffer());
-        if (audio.length >= 256) {
-          res.json({ audioBase64: audio.toString("base64"), mimeType: "audio/mpeg" });
-          return;
-        }
+    const result = body.async || body.jobId ? job : await zaraVoiceJobs.wait(job.jobId);
+    if (!body.async && !body.jobId) {
+      const legacyResponse = toLegacySpeakResponse(result);
+      if (!legacyResponse) {
+        res.status(503).json({
+          message: result.message ?? "Zara saját hangja nem érhető el.",
+        });
+        return;
       }
-    } catch (error) {
-      req.log.warn({ err: error }, "ElevenLabs speech request errored");
+      res.json(legacyResponse);
+      return;
     }
+    res.json(result);
+  } catch (error) {
+    const overloaded = error instanceof Error && /foglalt|várakozó/i.test(error.message);
+    req.log.warn(
+      { errorName: error instanceof Error ? error.name : "UnknownError" },
+      "Approved Zara voice request could not be queued",
+    );
+    res.status(overloaded ? 503 : 400).json({
+      message: error instanceof Error
+        ? error.message
+        : "Zara saját hangja nem érhető el. A szöveges válasz megmaradt.",
+    });
   }
-
-  res.status(502).json({ message: "Zara could not generate speech." });
 });
 
 let isSelfRepairRunning = false;

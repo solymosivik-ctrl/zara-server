@@ -195,7 +195,7 @@ paths:
       operationId: zaraSpeak
       tags: [zara]
       summary: Generate Zara speech audio
-      description: Converts a Zara text response to Hungarian speech through the secure server-side ElevenLabs connection.
+      description: Generates Hungarian speech using Zara's approved reference voice. Async requests and polling use this endpoint so slow local synthesis does not hold a mobile HTTP request open. Synchronous requests remain supported.
       requestBody:
         required: true
         content:
@@ -204,7 +204,7 @@ paths:
               $ref: "#/components/schemas/ZaraSpeakRequest"
       responses:
         "200":
-          description: Generated speech audio
+          description: Speech audio or the current asynchronous synthesis state
           content:
             application/json:
               schema:
@@ -212,9 +212,9 @@ paths:
         "400":
           description: Invalid speech request
         "502":
-          description: ElevenLabs request failed
+          description: Speech generation failed
         "503":
-          description: ElevenLabs is not configured
+          description: The approved voice engine is unavailable or busy
 components:
   securitySchemes:
     RepairWorkerBearer:
@@ -505,6 +505,17 @@ components:
         language:
           type: string
           enum: [en, hu]
+        async:
+          type: boolean
+          description: Return a synthesis job immediately instead of waiting for audio.
+        jobId:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Poll an earlier job using the same text and language.
+        cancel:
+          type: boolean
+          description: Cancel the job identified by jobId; never play a late result.
       required:
         - text
         - language
@@ -515,7 +526,16 @@ components:
           type: string
         mimeType:
           type: string
+        status:
+          type: string
+          enum: [queued, processing, completed, failed, cancelled]
+        jobId:
+          type: string
+        message:
+          type: string
+        retryAfterMs:
+          type: integer
+          minimum: 100
       required:
-        - audioBase64
-        - mimeType
+        - status
 

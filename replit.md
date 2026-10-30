@@ -34,7 +34,7 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Zara spoken replies must use only the approved F5 reference voice. If F5 fails, report an explicit error; never substitute another TTS engine or Android device TTS.
 
 ## Gotchas
 

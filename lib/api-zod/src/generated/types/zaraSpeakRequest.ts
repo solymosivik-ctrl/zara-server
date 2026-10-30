@@ -14,4 +14,14 @@ export interface ZaraSpeakRequest {
      */
   text: string;
   language: ZaraSpeakRequestLanguage;
+  /** Return a synthesis job immediately instead of waiting for audio. */
+  async?: boolean;
+  /**
+     * Poll an earlier job using the same text and language.
+     * @minLength 1
+     * @maxLength 80
+     */
+  jobId?: string;
+  /** Cancel the job identified by jobId; never play a late result. */
+  cancel?: boolean;
 }

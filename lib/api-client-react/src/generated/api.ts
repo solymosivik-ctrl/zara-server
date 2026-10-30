@@ -361,7 +361,7 @@ export const getZaraSpeakUrl = () => {
 }
 
 /**
- * Converts a Zara text response to Hungarian speech through the secure server-side ElevenLabs connection.
+ * Generates Hungarian speech using Zara's approved reference voice. Async requests and polling use this endpoint so slow local synthesis does not hold a mobile HTTP request open. Synchronous requests remain supported.
  * @summary Generate Zara speech audio
  */
 export const zaraSpeak = async (zaraSpeakRequest: ZaraSpeakRequest, options?: Parameters<typeof customFetch>[1]): Promise<ZaraSpeakResponse> => {

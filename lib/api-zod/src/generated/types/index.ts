@@ -29,6 +29,7 @@ export * from './zaraChatResponse';
 export * from './zaraSpeakRequest';
 export * from './zaraSpeakRequestLanguage';
 export * from './zaraSpeakResponse';
+export * from './zaraSpeakResponseStatus';
 export * from './zaraTranscribeRequest';
 export * from './zaraTranscribeRequestLanguage';
 export * from './zaraTranscribeResponse';

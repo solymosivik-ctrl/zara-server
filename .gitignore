@@ -46,6 +46,7 @@ Thumbs.db
 
 # Replit
 .cache/
+.pythonlibs/
 .local/
 
 # Zara Android release signing credentials

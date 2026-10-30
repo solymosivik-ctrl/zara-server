@@ -130,11 +130,45 @@ export default function HomeScreen() {
   });
   const speechPlayer = useAudioPlayer(null, { updateInterval: 100 });
   const speechStatus = useAudioPlayerStatus(speechPlayer);
+  const speechStatusRef = useRef(speechStatus);
+  speechStatusRef.current = speechStatus;
   const current = activeId ? conversations.find((item) => item.id === activeId) : undefined;
   const isThinking = Boolean(activeId && sendingConversationId === activeId);
   const isSpeaking = generatingSpeech || speechStatus.playing;
   const latestMessage = current?.messages[current.messages.length - 1];
   const diagnostics = useApiDiagnostics();
+  const lastPlayerDiagnosticRef = useRef('');
+
+  useEffect(() => {
+    const state = {
+      loaded: speechStatus.isLoaded,
+      playing: speechStatus.playing,
+      finished: speechStatus.didJustFinish,
+      error: speechStatus.error,
+    };
+    const signature = JSON.stringify(state);
+    if (signature === lastPlayerDiagnosticRef.current) return;
+    lastPlayerDiagnosticRef.current = signature;
+    if (!state.loaded && !state.playing && !state.finished && !state.error) return;
+
+    const safeError = state.error
+      ? state.error
+          .replace(/(?:https?|file|content):\/\/\S+/gi, '[uri omitted]')
+          .replace(/\bBearer\s+\S+/gi, 'Bearer [redacted]')
+          .replace(/\b[A-Za-z0-9+/=_-]{64,}\b/g, '[data omitted]')
+          .replace(/(?:[A-Za-z]:\\|\/)[^\s'"]+/g, '[path omitted]')
+          .slice(0, 180)
+      : 'none';
+    recordDiagnostic(
+      'AUDIO PLAYER',
+      `loaded=${state.loaded}; playing=${state.playing}; finished=${state.finished}; error=${safeError}`,
+    );
+  }, [
+    speechStatus.didJustFinish,
+    speechStatus.error,
+    speechStatus.isLoaded,
+    speechStatus.playing,
+  ]);
 
   useEffect(() => {
     if (!hydrated || activeId || conversations.length === 0) return;
@@ -153,9 +187,26 @@ export default function HomeScreen() {
       const speed = settings.voiceSpeed === 'slow' ? 0.9 : settings.voiceSpeed === 'fast' ? 1.1 : 1;
       const playback = await speak(
         responseText,
-        { language: 'hu-HU', speed, provider: 'elevenlabs' },
+        { language: 'hu-HU', speed, provider: 'sample' },
         speechPlayer,
       );
+      if (playback === 'sample') {
+        const playbackDeadline = Date.now() + 10_000;
+        while (Date.now() < playbackDeadline) {
+          const status = speechStatusRef.current;
+          if (status.error) {
+            recordDiagnostic('SPEAK FLOW ERROR', 'phase=player-start; playerError=reported');
+            throw new Error('Zara hangfájlja elkészült, de a lejátszó nem tudta elindítani.');
+          }
+          if (status.playing) break;
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if (!speechStatusRef.current.playing) {
+          recordDiagnostic('SPEAK FLOW ERROR', 'phase=player-start; playerError=playback-did-not-start');
+          throw new Error('Zara hangfájlja elkészült, de a lejátszás nem indult el.');
+        }
+        recordDiagnostic('SPEAK AUDIO', 'player=playing-confirmed');
+      }
       if (playback === 'device' && voiceSessionActiveRef.current) {
         setTimeout(() => void beginVoiceListening(), 250);
       }

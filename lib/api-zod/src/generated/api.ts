@@ -239,21 +239,34 @@ export const ZaraTranscribeResponse = zod.object({
 
 
 /**
- * Converts a Zara text response to Hungarian speech through the secure server-side ElevenLabs connection.
+ * Generates Hungarian speech using Zara's approved reference voice. Async requests and polling use this endpoint so slow local synthesis does not hold a mobile HTTP request open. Synchronous requests remain supported.
  * @summary Generate Zara speech audio
  */
 export const zaraSpeakBodyTextMax = 5000;
+
+export const zaraSpeakBodyJobIdMax = 80;
 
 
 
 export const ZaraSpeakBody = zod.object({
   "text": zod.string().min(1).max(zaraSpeakBodyTextMax),
-  "language": zod.enum(['en', 'hu'])
+  "language": zod.enum(['en', 'hu']),
+  "async": zod.boolean().optional().describe('Return a synthesis job immediately instead of waiting for audio.'),
+  "jobId": zod.string().min(1).max(zaraSpeakBodyJobIdMax).optional().describe('Poll an earlier job using the same text and language.'),
+  "cancel": zod.boolean().optional().describe('Cancel the job identified by jobId; never play a late result.')
 })
 
+export const zaraSpeakResponseRetryAfterMsMin = 100;
+
+
+
 export const ZaraSpeakResponse = zod.object({
-  "audioBase64": zod.string(),
-  "mimeType": zod.string()
+  "audioBase64": zod.string().optional(),
+  "mimeType": zod.string().optional(),
+  "status": zod.enum(['queued', 'processing', 'completed', 'failed', 'cancelled']),
+  "jobId": zod.string().optional(),
+  "message": zod.string().optional(),
+  "retryAfterMs": zod.number().int().min(zaraSpeakResponseRetryAfterMsMin).optional()
 })
 
 

@@ -4,10 +4,17 @@ import {
   setAudioModeAsync,
 } from 'expo-audio';
 import * as Speech from 'expo-speech';
+import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import { zaraSpeak, zaraTranscribe } from '@workspace/api-client-react';
+import { recordDiagnostic } from './api-diagnostics';
+import {
+  isSpeakJobPending,
+  parseSpeakAudioResponse,
+  type SpeakResponseLike,
+} from './speak-response';
 
-export type SpeechProvider = 'device' | 'elevenlabs';
+export type SpeechProvider = 'device' | 'sample';
 
 export type SpeechOptions = {
   language: 'en-US' | 'hu-HU';
@@ -67,8 +74,9 @@ export async function cancelListening(recorder: AudioRecorder): Promise<void> {
 const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
-let elevenLabsRetryAt = 0;
 let cachedHungarianVoiceId: string | undefined;
+let speechSequence = 0;
+let previousSpeechFile: File | null = null;
 
 export async function waitForSpeechEnd(
   recorder: AudioRecorder,
@@ -291,78 +299,177 @@ export async function stopListeningAndTranscribe(
   }
 }
 
-function decodeBase64(base64: string): Uint8Array {
-  const binary = globalThis.atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
+function logSpeakResponse(stage: string, value: unknown): void {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    recordDiagnostic('SPEAK RESPONSE', `stage=${stage}; parsed=${value === null ? 'null' : typeof value}`);
+    return;
   }
-  return bytes;
+  const data = value as Record<string, unknown>;
+  const allowedKeys = new Set([
+    'audioBase64', 'jobId', 'message', 'mimeType', 'retryAfterMs', 'status',
+  ]);
+  const keys = Object.keys(data).filter((key) => allowedKeys.has(key)).sort();
+  const audioBase64 = typeof data.audioBase64 === 'string' ? data.audioBase64 : '';
+  const status = ['queued', 'processing', 'completed', 'failed', 'cancelled'].includes(
+    String(data.status),
+  ) ? data.status : 'missing-or-unknown';
+  recordDiagnostic(
+    'SPEAK RESPONSE',
+    `stage=${stage}; keys=${keys.join(',') || '(none)'}; status=${String(status)}; ` +
+      `mimeType=${data.mimeType === 'audio/mpeg' ? 'audio/mpeg' : 'missing-or-other'}; ` +
+      `audioBase64Present=${audioBase64.length > 0}; audioBase64Chars=${audioBase64.length}; ` +
+      `jobIdPresent=${typeof data.jobId === 'string' && data.jobId.length > 0}`,
+  );
+}
+
+function sanitizeSpeechError(error: unknown): { name: string; status: string; message: string } {
+  const value = error && typeof error === 'object'
+    ? error as { name?: unknown; status?: unknown }
+    : {};
+  const name = typeof value.name === 'string' && /^[a-zA-Z0-9_.-]{1,50}$/.test(value.name)
+    ? value.name
+    : 'RequestError';
+  const status = typeof value.status === 'number' ? String(value.status) : 'none';
+  const message = (error instanceof Error ? error.message : '')
+    .replace(/(?:https?|file|content):\/\/\S+/gi, '[uri omitted]')
+    .replace(/\bBearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/\b[A-Za-z0-9+/=_-]{64,}\b/g, '[data omitted]')
+    .replace(/(?:[A-Za-z]:\\|\/)[^\s'"]+/g, '[path omitted]')
+    .slice(0, 180);
+  return { name, status, message };
 }
 
 export async function speak(
   text: string,
   options: SpeechOptions,
   player: AudioPlayer,
-): Promise<'elevenlabs' | 'device'> {
-  if (Date.now() >= elevenLabsRetryAt) {
+): Promise<'sample' | 'device'> {
+  if (options.provider === 'sample') {
+    let phase = 'start-request';
+    let generatedFile: File | null = null;
     try {
-      const response = await zaraSpeak({
+      let response = await zaraSpeak({
         text,
         language: options.language === 'hu-HU' ? 'hu' : 'en',
-      });
-      const extension = response.mimeType === 'audio/mpeg' ? '.mp3' : '.audio';
-      const audioFile = new File(Paths.cache, `zara-response${extension}`);
-      if (audioFile.exists) audioFile.delete();
-      audioFile.create({ overwrite: true });
-      audioFile.write(decodeBase64(response.audioBase64));
+        async: true,
+      }) as unknown as SpeakResponseLike;
+      logSpeakResponse('start', response);
 
+      const deadline = Date.now() + 15 * 60_000;
+      while (isSpeakJobPending(response)) {
+        phase = 'waiting-for-job';
+        if (typeof response.jobId !== 'string' || !response.jobId || Date.now() > deadline) {
+          throw new Error('Zara saját hangjának előállítása túl sokáig tart. A szöveges válasz megmaradt.');
+        }
+        const delay = Math.min(
+          3_000,
+          Math.max(500, typeof response.retryAfterMs === 'number' ? response.retryAfterMs : 1_500),
+        );
+        await wait(delay);
+        phase = 'poll-request';
+        response = await zaraSpeak({
+          text,
+          language: options.language === 'hu-HU' ? 'hu' : 'en',
+          async: true,
+          jobId: response.jobId,
+        }) as unknown as SpeakResponseLike;
+        logSpeakResponse('poll', response);
+      }
+
+      phase = 'validate-response';
+      const parsedAudio = parseSpeakAudioResponse(response);
+      if (!parsedAudio.ok) {
+        recordDiagnostic('SPEAK VALIDATION', parsedAudio.reason);
+        throw new Error(
+          typeof response.message === 'string'
+            ? response.message
+            : 'Zara saját hangja nem készült el. A szöveges válasz megmaradt.',
+        );
+      }
+
+      let audioUri: string;
+      if (Platform.OS === 'web') {
+        audioUri = `data:audio/mpeg;base64,${parsedAudio.audioBase64}`;
+      } else {
+        phase = 'write-mp3';
+        const audioFile = new File(Paths.cache, `zara-response-${++speechSequence}.mp3`);
+        generatedFile = audioFile;
+        if (audioFile.exists) audioFile.delete();
+        audioFile.create({ overwrite: true });
+        audioFile.write(parsedAudio.audioBytes);
+        if (!audioFile.exists || audioFile.size !== parsedAudio.audioBytes.byteLength) {
+          throw new Error('A generált MP3-fájl mentése nem sikerült.');
+        }
+        recordDiagnostic(
+          'SPEAK AUDIO',
+          `decodedMp3Bytes=${parsedAudio.audioBytes.byteLength}; ` +
+            `cacheFileCreated=${audioFile.exists}; cacheFileBytes=${audioFile.size}`,
+        );
+        audioUri = audioFile.uri;
+      }
+
+      phase = 'set-playback-mode';
       await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-      player.replace(audioFile.uri);
-      player.setPlaybackRate(1.06);
+      phase = 'player-replace';
+      player.replace(audioUri);
+      recordDiagnostic('SPEAK AUDIO', `player=replace; platform=${Platform.OS}`);
+      phase = 'set-playback-rate';
+      player.setPlaybackRate(options.speed ?? 1);
+      phase = 'player-play';
       player.play();
-      return 'elevenlabs';
-    } catch {
-      elevenLabsRetryAt = Date.now() + 10 * 60 * 1000;
+      recordDiagnostic('SPEAK AUDIO', `player=play-called; platform=${Platform.OS}`);
+      try {
+        if (previousSpeechFile?.exists) previousSpeechFile.delete();
+      } catch {
+        // The player may still be holding the previous cache file.
+      }
+      previousSpeechFile = generatedFile;
+      return 'sample';
+    } catch (error) {
+      const safe = sanitizeSpeechError(error);
+      recordDiagnostic(
+        'SPEAK FLOW ERROR',
+        `phase=${phase}; error=${safe.name}; httpStatus=${safe.status}` +
+          (safe.message ? `; message=${safe.message}` : ''),
+      );
+      throw error;
     }
   }
 
-  {
-    await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-    await Speech.stop();
-    if (!cachedHungarianVoiceId) {
-      const voices = await Speech.getAvailableVoicesAsync();
-      cachedHungarianVoiceId = voices
-        .filter((voice) => voice.language.toLowerCase().startsWith('hu'))
-        .sort((left, right) => {
-          const score = (voice: (typeof voices)[number]) => {
-            const metadata = voice as typeof voice & {
-              quality?: string;
-              networkConnectionRequired?: boolean;
-            };
-            const label = `${voice.identifier} ${voice.name}`.toLowerCase();
-            return (
-              (metadata.quality?.toLowerCase() === 'enhanced' ? 4 : 0) +
-              (label.includes('google') ? 3 : 0) +
-              (/\b(female|woman|női)\b/.test(label) ? 4 : 0) +
-              (label.includes('soft') || label.includes('natural') ? 1 : 0) +
-              (metadata.networkConnectionRequired ? 1 : 0)
-            );
+  await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+  await Speech.stop();
+  if (!cachedHungarianVoiceId) {
+    const voices = await Speech.getAvailableVoicesAsync();
+    cachedHungarianVoiceId = voices
+      .filter((voice) => voice.language.toLowerCase().startsWith('hu'))
+      .sort((left, right) => {
+        const score = (voice: (typeof voices)[number]) => {
+          const metadata = voice as typeof voice & {
+            quality?: string;
+            networkConnectionRequired?: boolean;
           };
-          return score(right) - score(left);
-        })[0]?.identifier;
-    }
-    await new Promise<void>((resolve, reject) => {
-      Speech.speak(text, {
-        language: options.language,
-        voice: cachedHungarianVoiceId,
-        rate: options.speed ? Math.min(1.08, Math.max(0.88, options.speed * 1.04)) : 1.02,
-        pitch: 0.96,
-        onDone: () => resolve(),
-        onStopped: () => resolve(),
-        onError: () => reject(new Error('A telefonos magyar felolvasás sem érhető el.')),
-      });
-    });
-    return 'device';
+          const label = `${voice.identifier} ${voice.name}`.toLowerCase();
+          return (
+            (metadata.quality?.toLowerCase() === 'enhanced' ? 4 : 0) +
+            (label.includes('google') ? 3 : 0) +
+            (/\b(female|woman|női)\b/.test(label) ? 4 : 0) +
+            (label.includes('soft') || label.includes('natural') ? 1 : 0) +
+            (metadata.networkConnectionRequired ? 1 : 0)
+          );
+        };
+        return score(right) - score(left);
+      })[0]?.identifier;
   }
+  await new Promise<void>((resolve, reject) => {
+    Speech.speak(text, {
+      language: options.language,
+      voice: cachedHungarianVoiceId,
+      rate: options.speed ? Math.min(1.08, Math.max(0.88, options.speed * 1.04)) : 1.02,
+      pitch: 0.96,
+      onDone: () => resolve(),
+      onStopped: () => resolve(),
+      onError: () => reject(new Error('A telefonos magyar felolvasás sem érhető el.')),
+    });
+  });
+  return 'device';
 }

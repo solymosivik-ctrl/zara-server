@@ -5,8 +5,14 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ZaraSpeakResponseStatus } from './zaraSpeakResponseStatus';
 
 export interface ZaraSpeakResponse {
-  audioBase64: string;
-  mimeType: string;
+  audioBase64?: string;
+  mimeType?: string;
+  status: ZaraSpeakResponseStatus;
+  jobId?: string;
+  message?: string;
+  /** @minimum 100 */
+  retryAfterMs?: number;
 }

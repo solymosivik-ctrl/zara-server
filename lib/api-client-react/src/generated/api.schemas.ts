@@ -117,10 +117,36 @@ export interface ZaraSpeakRequest {
      */
   text: string;
   language: ZaraSpeakRequestLanguage;
+  /** Return a synthesis job immediately instead of waiting for audio. */
+  async?: boolean;
+  /**
+     * Poll an earlier job using the same text and language.
+     * @minLength 1
+     * @maxLength 80
+     */
+  jobId?: string;
+  /** Cancel the job identified by jobId; never play a late result. */
+  cancel?: boolean;
 }
 
+export type ZaraSpeakResponseStatus = typeof ZaraSpeakResponseStatus[keyof typeof ZaraSpeakResponseStatus];
+
+
+export const ZaraSpeakResponseStatus = {
+  queued: 'queued',
+  processing: 'processing',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const;
+
 export interface ZaraSpeakResponse {
-  audioBase64: string;
-  mimeType: string;
+  audioBase64?: string;
+  mimeType?: string;
+  status: ZaraSpeakResponseStatus;
+  jobId?: string;
+  message?: string;
+  /** @minimum 100 */
+  retryAfterMs?: number;
 }
 
