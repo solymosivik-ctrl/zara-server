@@ -10,6 +10,7 @@ const repairRouter = createRepairRouter({
   store: new MemoryRepairIncidentStore(),
   workerToken: () => process.env["ZARA_REPAIR_WORKER_TOKEN"],
   repoRoot: process.cwd(),
+  trustRenderProxy: Boolean(process.env["RENDER_SERVICE_ID"]?.trim()),
 });
 
 router.use(healthRouter);

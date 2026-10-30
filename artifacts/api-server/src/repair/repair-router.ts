@@ -1,4 +1,5 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { isIP } from "node:net";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { CreateRepairCandidateBody } from "@workspace/api-zod";
 import {
@@ -12,13 +13,14 @@ import type { RepairIncidentStore } from "./store";
 
 const RepairCandidateInputSchema = CreateRepairCandidateBody.strict();
 
-const requestCounts = new Map<string, { count: number; resetAt: number }>();
 const MAX_REPORTS_PER_MINUTE = 12;
+const REPORT_WINDOW_MS = 60_000;
 
 export type RepairRouterOptions = {
   store: RepairIncidentStore;
   workerToken?: () => string | undefined;
   repoRoot: string;
+  trustRenderProxy?: boolean;
   candidateRunner?: (options: {
     repoRoot: string;
     incidentId: string;
@@ -72,9 +74,49 @@ function requireWorkerToken(
   return true;
 }
 
-function allowIncidentReport(req: Request, res: Response): boolean {
+function normalizeIpAddress(value: string | undefined): string | undefined {
+  const address = value?.trim();
+  if (!address) return undefined;
+
+  const version = isIP(address);
+  if (version === 4) return address;
+  if (version !== 6) return undefined;
+
+  try {
+    return new URL(`http://[${address}]/`).hostname.slice(1, -1).toLowerCase();
+  } catch {
+    return undefined;
+  }
+}
+
+function incidentRateLimitKey(req: Request, trustRenderProxy: boolean): string | undefined {
+  if (trustRenderProxy) {
+    // Render's Cloudflare edge overwrites CF-Connecting-IP. Do not trust
+    // X-Forwarded-For here: it can contain values supplied by the caller.
+    const clientIp = normalizeIpAddress(req.get("cf-connecting-ip"));
+    return clientIp ? `ip:${clientIp}` : undefined;
+  }
+
+  const socketIp = normalizeIpAddress(req.socket.remoteAddress);
+  return socketIp ? `ip:${socketIp}` : undefined;
+}
+
+function allowIncidentReport(
+  req: Request,
+  res: Response,
+  requestCounts: Map<string, { count: number; resetAt: number }>,
+  trustRenderProxy: boolean,
+): boolean {
+  const key = incidentRateLimitKey(req, trustRenderProxy);
+  if (!key) {
+    res.status(503).json({
+      code: "REPAIR_CLIENT_IP_UNAVAILABLE",
+      messageHu: "A biztonságos jelentésküldéshez nem állapítható meg a kliens címe.",
+    });
+    return false;
+  }
+
   const now = Date.now();
-  const key = req.ip || req.socket.remoteAddress || "unknown";
   for (const [address, count] of requestCounts) {
     if (now >= count.resetAt) requestCounts.delete(address);
   }
@@ -84,7 +126,7 @@ function allowIncidentReport(req: Request, res: Response): boolean {
   }
   const current = requestCounts.get(key);
   if (!current || now >= current.resetAt) {
-    requestCounts.set(key, { count: 1, resetAt: now + 60_000 });
+    requestCounts.set(key, { count: 1, resetAt: now + REPORT_WINDOW_MS });
     return true;
   }
   current.count += 1;
@@ -115,12 +157,22 @@ function publicIncident(record: RepairIncidentRecord) {
 
 export function createRepairRouter(options: RepairRouterOptions): IRouter {
   const router: IRouter = Router();
+  const requestCounts = new Map<string, { count: number; resetAt: number }>();
   let candidateJobActive = false;
   const getWorkerToken = options.workerToken ?? (() => undefined);
   const runner = options.candidateRunner ?? createRepairCandidate;
 
   router.post("/repair/incidents", async (req, res) => {
-    if (!allowIncidentReport(req, res)) return;
+    if (
+      !allowIncidentReport(
+        req,
+        res,
+        requestCounts,
+        options.trustRenderProxy ?? false,
+      )
+    ) {
+      return;
+    }
     const declaredSize = Number(req.header("content-length") ?? "0");
     if (Number.isFinite(declaredSize) && declaredSize > 16_384) {
       res.status(413).json({

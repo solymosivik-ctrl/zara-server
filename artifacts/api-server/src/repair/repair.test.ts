@@ -18,6 +18,37 @@ import { MemoryRepairIncidentStore } from "./store";
 
 const healthPath = "artifacts/api-server/src/routes/health.ts";
 
+async function startRateLimitTestServer(trustRenderProxy: boolean) {
+  const app = express();
+  app.use(express.json({ limit: "100kb" }));
+  app.use(
+    "/api",
+    createRepairRouter({
+      store: new MemoryRepairIncidentStore(),
+      repoRoot: process.cwd(),
+      trustRenderProxy,
+    }),
+  );
+  const server = app.listen(0);
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", resolve);
+    server.once("error", reject);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    throw new Error("Could not determine test server address");
+  }
+
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    close: () =>
+      new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      ),
+  };
+}
+
 function diffFor(pathName: string, oldText: string, newText: string): string {
   return [
     `diff --git a/${pathName} b/${pathName}`,
@@ -362,5 +393,98 @@ describe("repair API", () => {
       status = statusBody.state;
     }
     assert.equal(status, "candidate-ready");
+  });
+
+  it("rate-limits Render clients independently and ignores spoofed X-Forwarded-For", async () => {
+    const testServer = await startRateLimitTestServer(true);
+    try {
+      for (let request = 0; request < 12; request += 1) {
+        const response = await fetch(`${testServer.baseUrl}/api/repair/incidents`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "cf-connecting-ip": "2001:0db8:0:0:0:0:0:1",
+            "x-forwarded-for": `198.51.100.${request + 1}`,
+          },
+          body: JSON.stringify({ errorCode: "API_FAILURE" }),
+        });
+        assert.equal(response.status, 201);
+      }
+
+      const limitedClient = await fetch(`${testServer.baseUrl}/api/repair/incidents`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "cf-connecting-ip": "2001:db8::1",
+          "x-forwarded-for": "198.51.100.250",
+        },
+        body: JSON.stringify({ errorCode: "API_FAILURE" }),
+      });
+      assert.equal(limitedClient.status, 429);
+
+      const separateClient = await fetch(`${testServer.baseUrl}/api/repair/incidents`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "cf-connecting-ip": "203.0.113.11",
+          "x-forwarded-for": "198.51.100.250",
+        },
+        body: JSON.stringify({ errorCode: "API_FAILURE" }),
+      });
+      assert.equal(separateClient.status, 201);
+
+      const missingProxyIp = await fetch(`${testServer.baseUrl}/api/repair/incidents`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": "203.0.113.12",
+        },
+        body: JSON.stringify({ errorCode: "API_FAILURE" }),
+      });
+      assert.equal(missingProxyIp.status, 503);
+
+      const malformedProxyIp = await fetch(`${testServer.baseUrl}/api/repair/incidents`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "cf-connecting-ip": "203.0.113.12, 198.51.100.12",
+        },
+        body: JSON.stringify({ errorCode: "API_FAILURE" }),
+      });
+      assert.equal(malformedProxyIp.status, 503);
+    } finally {
+      await testServer.close();
+    }
+  });
+
+  it("does not trust caller-supplied forwarding headers outside Render", async () => {
+    const testServer = await startRateLimitTestServer(false);
+    try {
+      for (let request = 0; request < 12; request += 1) {
+        const response = await fetch(`${testServer.baseUrl}/api/repair/incidents`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "cf-connecting-ip": `203.0.113.${request + 1}`,
+            "x-forwarded-for": `198.51.100.${request + 1}`,
+          },
+          body: JSON.stringify({ errorCode: "API_FAILURE" }),
+        });
+        assert.equal(response.status, 201);
+      }
+
+      const spoofedForwardedIp = await fetch(`${testServer.baseUrl}/api/repair/incidents`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "cf-connecting-ip": "203.0.113.250",
+          "x-forwarded-for": "198.51.100.250",
+        },
+        body: JSON.stringify({ errorCode: "API_FAILURE" }),
+      });
+      assert.equal(spoofedForwardedIp.status, 429);
+    } finally {
+      await testServer.close();
+    }
   });
 });

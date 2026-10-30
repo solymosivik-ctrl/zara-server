@@ -53,6 +53,8 @@ paths:
           description: Diagnostic payload is too large
         "429":
           description: Diagnostic reporting rate limit reached
+        "503":
+          description: A trusted client IP could not be determined
   /repair/candidates:
     post:
       operationId: createRepairCandidate
