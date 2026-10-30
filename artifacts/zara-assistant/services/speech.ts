@@ -41,8 +41,63 @@ export class VoiceInputError extends Error {
   }
 }
 
+function safeVoiceDiagnosticError(error: unknown): string {
+  const value = error && typeof error === 'object'
+    ? error as { name?: unknown; status?: unknown }
+    : {};
+  const name = typeof value.name === 'string' && /^[a-zA-Z0-9_.-]{1,50}$/.test(value.name)
+    ? value.name
+    : 'Error';
+  const status = typeof value.status === 'number' ? String(value.status) : 'none';
+  const message = (error instanceof Error ? error.message : '')
+    .replace(/(?:https?|file|content):\/\/\S+/gi, '[uri omitted]')
+    .replace(/\bBearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/\b[A-Za-z0-9+/=_-]{64,}\b/g, '[data omitted]')
+    .replace(/(?:[A-Za-z]:\\|\/)[^\s'"]+/g, '[path omitted]')
+    .slice(0, 160);
+  return `error=${name}; httpStatus=${status}${message ? `; message=${message}` : ''}`;
+}
+
+type CaptureDiagnostic = {
+  mode: 'command' | 'wake-word';
+  endReason: string;
+  durationMs: number;
+  recording: boolean;
+  meteringReceived: boolean;
+  lastMeteringDb: number | null;
+  peakMeteringDb: number;
+  activeThresholdDb: number;
+  speechThresholdDb: number;
+  silenceThresholdDb: number;
+  heardSpeech: boolean;
+};
+
+function logCaptureDiagnostic(details: CaptureDiagnostic): void {
+  const level = (value: number | null) =>
+    value === null || !Number.isFinite(value) ? 'n/a' : value.toFixed(1);
+  recordDiagnostic(
+    'MICROPHONE CAPTURE',
+    `mode=${details.mode}; endReason=${details.endReason}; recording=${details.recording}; ` +
+      `durationMs=${details.durationMs}; meteringReceived=${details.meteringReceived}; ` +
+      `lastMeteringDb=${level(details.lastMeteringDb)}; peakMeteringDb=${level(details.peakMeteringDb)}; ` +
+      `activeThresholdDb=${level(details.activeThresholdDb)}; ` +
+      `speechThresholdDb=${level(details.speechThresholdDb)}; ` +
+      `silenceThresholdDb=${level(details.silenceThresholdDb)}; heardSpeech=${details.heardSpeech}`,
+  );
+}
+
 export async function startListening(recorder: AudioRecorder): Promise<void> {
-  const permission = await requestRecordingPermissionsAsync();
+  let permission: Awaited<ReturnType<typeof requestRecordingPermissionsAsync>>;
+  try {
+    permission = await requestRecordingPermissionsAsync();
+  } catch (error) {
+    recordDiagnostic('MICROPHONE PERMISSION', `result=request-error; ${safeVoiceDiagnosticError(error)}`);
+    throw error;
+  }
+  recordDiagnostic(
+    'MICROPHONE PERMISSION',
+    `granted=${permission.granted}; canAskAgain=${permission.canAskAgain}`,
+  );
   if (!permission.granted) {
     throw new VoiceInputError(
       permission.canAskAgain
@@ -56,7 +111,13 @@ export async function startListening(recorder: AudioRecorder): Promise<void> {
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
     await recorder.prepareToRecordAsync();
     recorder.record();
-  } catch {
+    const status = recorder.getStatus();
+    recordDiagnostic(
+      'MICROPHONE RECORDING',
+      `recordCall=returned; active=${status.isRecording}; meteringAvailable=${typeof status.metering === 'number'}`,
+    );
+  } catch (error) {
+    recordDiagnostic('MICROPHONE START ERROR', `phase=prepare-or-record; ${safeVoiceDiagnosticError(error)}`);
     throw new VoiceInputError(
       'Zara could not start the microphone. Please try again.',
       'recording-failed',
@@ -96,17 +157,39 @@ export async function waitForSpeechEnd(
   let heardSpeech = false;
   let receivedMetering = false;
   let peakLevelDb = -160;
+  let lastMeteringDb: number | null = null;
+  let activeSpeechThresholdDb = silenceThresholdDb;
   let lastSpeechAt = Date.now();
 
   while (true) {
     const status = recorder.getStatus();
-    if (!status.isRecording) return 'stopped';
-    if (status.durationMillis >= maximumDurationMs) return 'timeout';
+    const logEnd = (endReason: string) => logCaptureDiagnostic({
+      mode: 'command',
+      endReason,
+      durationMs: status.durationMillis,
+      recording: status.isRecording,
+      meteringReceived: receivedMetering,
+      lastMeteringDb,
+      peakMeteringDb: peakLevelDb,
+      activeThresholdDb: activeSpeechThresholdDb,
+      speechThresholdDb,
+      silenceThresholdDb,
+      heardSpeech,
+    });
+    if (!status.isRecording) {
+      logEnd('recorder-stopped');
+      return 'stopped';
+    }
+    if (status.durationMillis >= maximumDurationMs) {
+      logEnd('timeout-maximum-duration');
+      return 'timeout';
+    }
 
     if (typeof status.metering === 'number') {
       receivedMetering = true;
+      lastMeteringDb = status.metering;
       peakLevelDb = Math.max(peakLevelDb, status.metering);
-      const activeSpeechThresholdDb = Math.max(
+      activeSpeechThresholdDb = Math.max(
         silenceThresholdDb,
         peakLevelDb - 18,
       );
@@ -120,12 +203,15 @@ export async function waitForSpeechEnd(
         status.durationMillis >= 700 &&
         Date.now() - lastSpeechAt >= silenceDurationMs
       ) {
+        logEnd('silence-detected');
         return 'silence';
       }
       if (!heardSpeech && status.durationMillis >= 8_000) {
+        logEnd('timeout-no-speech-by-8s');
         return 'timeout';
       }
     } else if (!receivedMetering && status.durationMillis >= meteringFallbackDurationMs) {
+      logEnd('timeout-no-metering-fallback');
       return 'timeout';
     }
 
@@ -149,21 +235,43 @@ export async function waitForWakeWordCandidate(
   let heardSpeech = false;
   let receivedMetering = false;
   let peakLevelDb = -160;
+  let lastMeteringDb: number | null = null;
+  let activeSpeechThresholdDb = silenceThresholdDb;
   let lastSpeechAt = Date.now();
   const meteringSamples: number[] = [];
 
   while (true) {
     const status = recorder.getStatus();
-    if (!status.isRecording) return { heardSpeech: false, fingerprint: [] };
-    if (typeof status.metering === 'number') meteringSamples.push(status.metering);
+    const logEnd = (endReason: string) => logCaptureDiagnostic({
+      mode: 'wake-word',
+      endReason,
+      durationMs: status.durationMillis,
+      recording: status.isRecording,
+      meteringReceived: receivedMetering,
+      lastMeteringDb,
+      peakMeteringDb: peakLevelDb,
+      activeThresholdDb: activeSpeechThresholdDb,
+      speechThresholdDb,
+      silenceThresholdDb,
+      heardSpeech,
+    });
+    if (!status.isRecording) {
+      logEnd('recorder-stopped');
+      return { heardSpeech: false, fingerprint: [] };
+    }
+    if (typeof status.metering === 'number') {
+      receivedMetering = true;
+      lastMeteringDb = status.metering;
+      peakLevelDb = Math.max(peakLevelDb, status.metering);
+      activeSpeechThresholdDb = Math.max(silenceThresholdDb, peakLevelDb - 18);
+      meteringSamples.push(status.metering);
+    }
     if (status.durationMillis >= maximumDurationMs) {
+      logEnd(receivedMetering ? 'maximum-duration' : 'maximum-duration-no-metering');
       return { heardSpeech, fingerprint: makeFingerprint(meteringSamples) };
     }
 
     if (typeof status.metering === 'number') {
-      receivedMetering = true;
-      peakLevelDb = Math.max(peakLevelDb, status.metering);
-      const activeSpeechThresholdDb = Math.max(silenceThresholdDb, peakLevelDb - 18);
       if (status.metering >= activeSpeechThresholdDb && peakLevelDb >= speechThresholdDb) {
         heardSpeech = true;
         lastSpeechAt = Date.now();
@@ -172,9 +280,11 @@ export async function waitForWakeWordCandidate(
         status.durationMillis >= 600 &&
         Date.now() - lastSpeechAt >= silenceDurationMs
       ) {
+        logEnd('silence-detected');
         return { heardSpeech: true, fingerprint: makeFingerprint(meteringSamples) };
       }
     } else if (!receivedMetering && status.durationMillis >= maximumDurationMs) {
+      logEnd('maximum-duration-no-metering');
       return { heardSpeech: true, fingerprint: makeFingerprint(meteringSamples) };
     }
 
@@ -276,16 +386,34 @@ export async function stopListeningAndTranscribe(
   recorder: AudioRecorder,
   language: 'en' | 'hu',
 ): Promise<string> {
+  let phase = 'stop-recording';
   try {
     await recorder.stop();
+    phase = 'disable-recording-mode';
     await setAudioModeAsync({ allowsRecording: false });
     if (!recorder.uri) {
       throw new Error('No microphone recording was created.');
     }
+    phase = 'read-recording';
     const recording = await recordingToBase64(recorder.uri);
+    phase = 'transcribe-request';
+    recordDiagnostic(
+      'TRANSCRIBE FLOW',
+      `request=start; mimeType=${recording.mimeType}; audioBase64Chars=${recording.audioBase64.length}`,
+    );
     const response = await zaraTranscribe({ ...recording, language });
-    return response.transcript.trim();
+    phase = 'validate-transcript';
+    const transcript = response.transcript.trim();
+    recordDiagnostic(
+      'TRANSCRIBE FLOW',
+      `response=received; transcriptChars=${transcript.length}; empty=${transcript.length === 0}`,
+    );
+    if (!transcript) {
+      recordDiagnostic('TRANSCRIBE EMPTY', 'reason=empty-transcript');
+    }
+    return transcript;
   } catch (error) {
+    recordDiagnostic('TRANSCRIBE FLOW ERROR', `phase=${phase}; ${safeVoiceDiagnosticError(error)}`);
     if (error instanceof VoiceInputError) throw error;
     const message =
       error instanceof Error ? error.message : 'Zara could not recognize your speech.';

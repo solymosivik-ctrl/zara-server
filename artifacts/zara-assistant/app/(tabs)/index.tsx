@@ -425,6 +425,10 @@ export default function HomeScreen() {
           }
         })
         .catch((error) => {
+          recordDiagnostic(
+            'MICROPHONE MONITOR ERROR',
+            `error=${error instanceof Error ? error.name : 'UnknownError'}`,
+          );
           setVoiceError(
             error instanceof Error
               ? error.message
@@ -538,6 +542,11 @@ export default function HomeScreen() {
             }
           }
         } catch (error) {
+          recordDiagnostic(
+            'WAKE WORD CAPTURE ERROR',
+            `error=${error instanceof Error ? error.name : 'UnknownError'}; ` +
+              `voiceInputCode=${error instanceof VoiceInputError ? error.code : 'none'}`,
+          );
           if (
             !cancelled &&
             error instanceof VoiceInputError &&
