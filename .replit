@@ -34,6 +34,9 @@ ZARA_RELEASE_KEY_ALIAS = "zara-release"
 localPort = 8080
 externalPort = 8080
 
+[[ports]]
+localPort = 8081
+externalPort = 80
 
 [[ports]]
 localPort = 19628
