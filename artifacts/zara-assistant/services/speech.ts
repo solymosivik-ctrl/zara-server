@@ -4,6 +4,7 @@ import {
   setAudioModeAsync,
 } from 'expo-audio';
 import * as Speech from 'expo-speech';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import { zaraSpeak, zaraTranscribe } from '@workspace/api-client-react';
@@ -361,12 +362,12 @@ export function voiceFingerprintSimilarity(
 }
 
 async function recordingToBase64(uri: string): Promise<{ audioBase64: string; mimeType: string }> {
-  const file = new File(uri);
-  if (!file.exists || file.size <= 0) {
+  const info = await LegacyFileSystem.getInfoAsync(uri);
+  if (!info.exists || !info.size || info.size <= 0) {
     throw new Error('The microphone recording is empty.');
   }
 
-  const extension = file.extension.toLowerCase();
+  const extension = uri.split(/[?#]/, 1)[0].match(/\.[a-z0-9]+$/i)?.[0]?.toLowerCase() ?? '';
   const mimeType =
     extension === '.webm'
       ? 'audio/webm'
@@ -377,7 +378,9 @@ async function recordingToBase64(uri: string): Promise<{ audioBase64: string; mi
           : 'audio/mp4';
 
   return {
-    audioBase64: await file.base64(),
+    audioBase64: await LegacyFileSystem.readAsStringAsync(uri, {
+      encoding: LegacyFileSystem.EncodingType.Base64,
+    }),
     mimeType,
   };
 }
