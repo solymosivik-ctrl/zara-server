@@ -18,6 +18,152 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Accepts allowlisted diagnostic metadata only; raw audio, transcripts, request bodies, and credentials are not accepted.
+ * @summary Submit a sanitized Zara diagnostic incident
+ */
+export const createRepairIncidentBodySourceDefault = `mobile`;
+export const createRepairIncidentBodyErrorCodeMax = 64;
+
+
+export const createRepairIncidentBodyErrorCodeRegExp = new RegExp('^[a-zA-Z0-9_.:-]+$');
+export const createRepairIncidentBodyStatusMin = 100;
+export const createRepairIncidentBodyStatusMax = 599;
+
+export const createRepairIncidentBodyDurationMsMin = 0;
+export const createRepairIncidentBodyDurationMsMax = 300000;
+
+export const createRepairIncidentBodyAppVersionMax = 40;
+
+
+export const createRepairIncidentBodyAppVersionRegExp = new RegExp('^[a-zA-Z0-9.+_-]*$');
+export const createRepairIncidentBodyRequestIdMax = 80;
+
+
+export const createRepairIncidentBodyRequestIdRegExp = new RegExp('^[a-zA-Z0-9_-]*$');
+export const createRepairIncidentBodyEventsItemStatusMin = 100;
+export const createRepairIncidentBodyEventsItemStatusMax = 599;
+
+export const createRepairIncidentBodyEventsItemDurationMsMin = 0;
+export const createRepairIncidentBodyEventsItemDurationMsMax = 300000;
+
+export const createRepairIncidentBodyEventsMax = 20;
+
+
+
+export const CreateRepairIncidentBody = zod.object({
+  "source": zod.enum(['mobile', 'api']).default(createRepairIncidentBodySourceDefault),
+  "errorCode": zod.string().min(1).max(createRepairIncidentBodyErrorCodeMax).regex(createRepairIncidentBodyErrorCodeRegExp),
+  "endpoint": zod.enum(['/api/healthz', '/api/zara/chat', '/api/zara/weather', '/api/zara/transcribe', '/api/zara/speak']).optional(),
+  "method": zod.enum(['GET', 'POST']).optional(),
+  "status": zod.number().int().min(createRepairIncidentBodyStatusMin).max(createRepairIncidentBodyStatusMax).optional(),
+  "durationMs": zod.number().int().min(createRepairIncidentBodyDurationMsMin).max(createRepairIncidentBodyDurationMsMax).optional(),
+  "appVersion": zod.string().max(createRepairIncidentBodyAppVersionMax).regex(createRepairIncidentBodyAppVersionRegExp).optional(),
+  "requestId": zod.string().max(createRepairIncidentBodyRequestIdMax).regex(createRepairIncidentBodyRequestIdRegExp).optional(),
+  "events": zod.array(zod.object({
+  "phase": zod.enum(['before', 'after', 'error']),
+  "endpoint": zod.enum(['/api/healthz', '/api/zara/chat', '/api/zara/weather', '/api/zara/transcribe', '/api/zara/speak']),
+  "method": zod.enum(['GET', 'POST']),
+  "status": zod.number().int().min(createRepairIncidentBodyEventsItemStatusMin).max(createRepairIncidentBodyEventsItemStatusMax).nullish(),
+  "durationMs": zod.number().int().min(createRepairIncidentBodyEventsItemDurationMsMin).max(createRepairIncidentBodyEventsItemDurationMsMax).optional()
+})).max(createRepairIncidentBodyEventsMax).optional()
+})
+
+export const createRepairIncidentResponseConfidenceMin = 0;
+export const createRepairIncidentResponseConfidenceMax = 1;
+
+
+
+export const CreateRepairIncidentResponse = zod.object({
+  "id": zod.string().uuid(),
+  "createdAt": zod.coerce.date(),
+  "component": zod.enum(['microphone', 'speech-recognition', 'text-to-speech', 'wake-word', 'audio-signal', 'api-connection', 'server-health', 'unknown']),
+  "confidence": zod.number().min(createRepairIncidentResponseConfidenceMin).max(createRepairIncidentResponseConfidenceMax),
+  "severity": zod.enum(['low', 'medium', 'high']),
+  "summaryHu": zod.string(),
+  "nextStepHu": zod.string(),
+  "state": zod.enum(['diagnosed', 'candidate-running', 'candidate-ready', 'candidate-failed']),
+  "candidateRef": zod.string().optional(),
+  "checkpointRef": zod.string().optional(),
+  "tests": zod.array(zod.object({
+  "name": zod.string(),
+  "passed": zod.boolean(),
+  "detail": zod.string().optional()
+})).optional(),
+  "messageHu": zod.string()
+})
+
+
+/**
+ * Requires a private worker bearer token. Creates a tagged restore point and candidate branch; never merges or deploys the candidate.
+ * @summary Validate a repair patch in an isolated Git worktree
+ */
+export const createRepairCandidateBodyPatchMax = 65536;
+
+
+
+export const CreateRepairCandidateBody = zod.object({
+  "incidentId": zod.string().uuid(),
+  "patch": zod.string().min(1).max(createRepairCandidateBodyPatchMax)
+})
+
+export const createRepairCandidateResponseConfidenceMin = 0;
+export const createRepairCandidateResponseConfidenceMax = 1;
+
+
+
+export const CreateRepairCandidateResponse = zod.object({
+  "id": zod.string().uuid(),
+  "createdAt": zod.coerce.date(),
+  "component": zod.enum(['microphone', 'speech-recognition', 'text-to-speech', 'wake-word', 'audio-signal', 'api-connection', 'server-health', 'unknown']),
+  "confidence": zod.number().min(createRepairCandidateResponseConfidenceMin).max(createRepairCandidateResponseConfidenceMax),
+  "severity": zod.enum(['low', 'medium', 'high']),
+  "summaryHu": zod.string(),
+  "nextStepHu": zod.string(),
+  "state": zod.enum(['diagnosed', 'candidate-running', 'candidate-ready', 'candidate-failed']),
+  "candidateRef": zod.string().optional(),
+  "checkpointRef": zod.string().optional(),
+  "tests": zod.array(zod.object({
+  "name": zod.string(),
+  "passed": zod.boolean(),
+  "detail": zod.string().optional()
+})).optional(),
+  "messageHu": zod.string()
+})
+
+
+/**
+ * @summary Read a repair candidate status
+ */
+export const GetRepairIncidentParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const getRepairIncidentResponseConfidenceMin = 0;
+export const getRepairIncidentResponseConfidenceMax = 1;
+
+
+
+export const GetRepairIncidentResponse = zod.object({
+  "id": zod.string().uuid(),
+  "createdAt": zod.coerce.date(),
+  "component": zod.enum(['microphone', 'speech-recognition', 'text-to-speech', 'wake-word', 'audio-signal', 'api-connection', 'server-health', 'unknown']),
+  "confidence": zod.number().min(getRepairIncidentResponseConfidenceMin).max(getRepairIncidentResponseConfidenceMax),
+  "severity": zod.enum(['low', 'medium', 'high']),
+  "summaryHu": zod.string(),
+  "nextStepHu": zod.string(),
+  "state": zod.enum(['diagnosed', 'candidate-running', 'candidate-ready', 'candidate-failed']),
+  "candidateRef": zod.string().optional(),
+  "checkpointRef": zod.string().optional(),
+  "tests": zod.array(zod.object({
+  "name": zod.string(),
+  "passed": zod.boolean(),
+  "detail": zod.string().optional()
+})).optional(),
+  "messageHu": zod.string()
+})
+
+
+/**
  * Sends a conversation turn to the configured server-side AI provider.
  * @summary Generate a Zara assistant response
  */

@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: zara
     description: Zara AI assistant operations
+  - name: repair
+    description: Safe Zara diagnostics and isolated repair candidates
 paths:
   /healthz:
     get:
@@ -26,6 +28,93 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /repair/incidents:
+    post:
+      operationId: createRepairIncident
+      tags: [repair]
+      summary: Submit a sanitized Zara diagnostic incident
+      description: Accepts allowlisted diagnostic metadata only; raw audio, transcripts, request bodies, and credentials are not accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepairIncidentRequest"
+      responses:
+        "201":
+          description: Incident classified and recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepairIncidentResponse"
+        "400":
+          description: Invalid or unsafe diagnostic payload
+        "413":
+          description: Diagnostic payload is too large
+        "429":
+          description: Diagnostic reporting rate limit reached
+        "503":
+          description: A trusted client IP could not be determined
+  /repair/candidates:
+    post:
+      operationId: createRepairCandidate
+      tags: [repair]
+      summary: Validate a repair patch in an isolated Git worktree
+      description: Requires a private worker bearer token. Creates a tagged restore point and candidate branch; never merges or deploys the candidate.
+      security:
+        - RepairWorkerBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RepairCandidateRequest"
+      responses:
+        "202":
+          description: Candidate validation started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepairIncidentResponse"
+        "400":
+          description: Invalid candidate request
+        "401":
+          description: Worker authentication failed
+        "403":
+          description: Incident component is outside the health-route-only repair policy
+        "404":
+          description: Incident does not exist
+        "409":
+          description: Another candidate validation is running
+        "503":
+          description: Repair worker is not configured
+  /repair/incidents/{id}:
+    get:
+      operationId: getRepairIncident
+      tags: [repair]
+      summary: Read a repair candidate status
+      security:
+        - RepairWorkerBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Current incident and candidate status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepairIncidentResponse"
+        "401":
+          description: Worker authentication failed
+        "404":
+          description: Incident does not exist
+        "503":
+          description: Repair worker is not configured
   /zara/chat:
     post:
       operationId: zaraChat
@@ -127,6 +216,10 @@ paths:
         "503":
           description: ElevenLabs is not configured
 components:
+  securitySchemes:
+    RepairWorkerBearer:
+      type: http
+      scheme: bearer
   schemas:
     HealthStatus:
       type: object
@@ -135,6 +228,164 @@ components:
           type: string
       required:
         - status
+    RepairEndpoint:
+      type: string
+      enum:
+        - /api/healthz
+        - /api/zara/chat
+        - /api/zara/weather
+        - /api/zara/transcribe
+        - /api/zara/speak
+    RepairEvent:
+      type: object
+      additionalProperties: false
+      properties:
+        phase:
+          type: string
+          enum: [before, after, error]
+        endpoint:
+          $ref: "#/components/schemas/RepairEndpoint"
+        method:
+          type: string
+          enum: [GET, POST]
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+          nullable: true
+        durationMs:
+          type: integer
+          minimum: 0
+          maximum: 300000
+      required: [phase, endpoint, method]
+    RepairIncidentRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        source:
+          type: string
+          enum: [mobile, api]
+          default: mobile
+        errorCode:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: "^[a-zA-Z0-9_.:-]+$"
+        endpoint:
+          $ref: "#/components/schemas/RepairEndpoint"
+        method:
+          type: string
+          enum: [GET, POST]
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+        durationMs:
+          type: integer
+          minimum: 0
+          maximum: 300000
+        appVersion:
+          type: string
+          maxLength: 40
+          pattern: "^[a-zA-Z0-9.+_-]*$"
+        requestId:
+          type: string
+          maxLength: 80
+          pattern: "^[a-zA-Z0-9_-]*$"
+        events:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/RepairEvent"
+      required: [errorCode]
+    RepairCandidateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        incidentId:
+          type: string
+          format: uuid
+        patch:
+          type: string
+          minLength: 1
+          maxLength: 65536
+      required: [incidentId, patch]
+    RepairComponent:
+      type: string
+      enum:
+        - microphone
+        - speech-recognition
+        - text-to-speech
+        - wake-word
+        - audio-signal
+        - api-connection
+        - server-health
+        - unknown
+    RepairSeverity:
+      type: string
+      enum: [low, medium, high]
+    RepairState:
+      type: string
+      enum:
+        - diagnosed
+        - candidate-running
+        - candidate-ready
+        - candidate-failed
+    RepairTestResult:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        passed:
+          type: boolean
+        detail:
+          type: string
+      required: [name, passed]
+    RepairIncidentResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        component:
+          $ref: "#/components/schemas/RepairComponent"
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        severity:
+          $ref: "#/components/schemas/RepairSeverity"
+        summaryHu:
+          type: string
+        nextStepHu:
+          type: string
+        state:
+          $ref: "#/components/schemas/RepairState"
+        candidateRef:
+          type: string
+        checkpointRef:
+          type: string
+        tests:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepairTestResult"
+        messageHu:
+          type: string
+      required:
+        - id
+        - createdAt
+        - component
+        - confidence
+        - severity
+        - summaryHu
+        - nextStepHu
+        - state
+        - messageHu
     ZaraChatMessage:
       type: object
       properties:
