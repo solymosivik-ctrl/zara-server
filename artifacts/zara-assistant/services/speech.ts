@@ -361,14 +361,9 @@ export function voiceFingerprintSimilarity(
   return comparedSamples.reduce((sum, score) => sum + score, 0) / comparedSamples.length;
 }
 
-async function recordingToBase64(uri: string): Promise<{ audioBase64: string; mimeType: string }> {
-  const info = await LegacyFileSystem.getInfoAsync(uri);
-  if (!info.exists || !info.size || info.size <= 0) {
-    throw new Error('The microphone recording is empty.');
-  }
-
+function recordingMimeType(uri: string, blobType?: string): string {
   const extension = uri.split(/[?#]/, 1)[0].match(/\.[a-z0-9]+$/i)?.[0]?.toLowerCase() ?? '';
-  const mimeType =
+  const extensionMimeType =
     extension === '.webm'
       ? 'audio/webm'
       : extension === '.wav'
@@ -376,13 +371,64 @@ async function recordingToBase64(uri: string): Promise<{ audioBase64: string; mi
         : extension === '.3gp'
           ? 'audio/3gpp'
           : 'audio/mp4';
+  const detectedMimeType = blobType?.split(';', 1)[0].trim().toLowerCase();
+  return detectedMimeType?.startsWith('audio/') ? detectedMimeType : extensionMimeType;
+}
 
-  return {
-    audioBase64: await LegacyFileSystem.readAsStringAsync(uri, {
-      encoding: LegacyFileSystem.EncodingType.Base64,
-    }),
-    mimeType,
-  };
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('The browser could not encode the microphone recording.'));
+        return;
+      }
+      const separator = reader.result.indexOf(',');
+      if (separator < 0) {
+        reject(new Error('The browser returned an invalid recording data URL.'));
+        return;
+      }
+      resolve(reader.result.slice(separator + 1));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('The browser could not read the microphone recording.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function recordingToBase64(uri: string): Promise<{ audioBase64: string; mimeType: string }> {
+  try {
+    if (Platform.OS === 'web') {
+      const response = await fetch(uri);
+      if (!response.ok) {
+        throw new Error(`Recording fetch failed with HTTP ${response.status}.`);
+      }
+      const blob = await response.blob();
+      if (blob.size <= 0) {
+        throw new Error('The microphone recording is empty.');
+      }
+      return {
+        audioBase64: await blobToBase64(blob),
+        mimeType: recordingMimeType(uri, blob.type),
+      };
+    }
+
+    const info = await LegacyFileSystem.getInfoAsync(uri);
+    if (!info.exists || !info.size || info.size <= 0) {
+      throw new Error('The microphone recording is empty.');
+    }
+    return {
+      audioBase64: await LegacyFileSystem.readAsStringAsync(uri, {
+        encoding: LegacyFileSystem.EncodingType.Base64,
+      }),
+      mimeType: recordingMimeType(uri),
+    };
+  } catch (error) {
+    recordDiagnostic(
+      'TRANSCRIBE RECORDING READ ERROR',
+      `platform=${Platform.OS}; ${safeVoiceDiagnosticError(error)}`,
+    );
+    throw error;
+  }
 }
 
 export async function stopListeningAndTranscribe(
@@ -402,7 +448,8 @@ export async function stopListeningAndTranscribe(
     phase = 'transcribe-request';
     recordDiagnostic(
       'TRANSCRIBE FLOW',
-      `request=start; mimeType=${recording.mimeType}; audioBase64Chars=${recording.audioBase64.length}`,
+      `request=start; platform=${Platform.OS}; mimeType=${recording.mimeType}; ` +
+        `audioBase64Chars=${recording.audioBase64.length}`,
     );
     const response = await zaraTranscribe({ ...recording, language });
     phase = 'validate-transcript';
