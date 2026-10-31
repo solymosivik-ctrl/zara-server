@@ -1,0 +1,1 @@
+- [pnpm dependency patches](pnpm-dependency-patches.md) — `pnpm patch-commit` can reserialize workspace config and refresh unrelated lockfile entries; review and trim its diff.

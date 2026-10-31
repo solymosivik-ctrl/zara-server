@@ -27,6 +27,20 @@ export type SpeechOptions = {
 export type SpeechEndReason = 'silence' | 'timeout' | 'stopped';
 export type VoiceFingerprint = number[];
 
+type RecorderDiagnosticStatus = ReturnType<AudioRecorder['getStatus']> & {
+  meteringError?: string;
+};
+
+function getRecorderDiagnosticStatus(recorder: AudioRecorder): RecorderDiagnosticStatus {
+  return recorder.getStatus() as RecorderDiagnosticStatus;
+}
+
+function safeMeteringError(value: unknown): string {
+  return typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_.]{0,59}$/.test(value)
+    ? value
+    : 'none';
+}
+
 export class VoiceInputError extends Error {
   constructor(
     message: string,
@@ -67,13 +81,25 @@ type CaptureDiagnostic = {
   meteringReceived: boolean;
   lastMeteringDb: number | null;
   peakMeteringDb: number;
+  meteringReadErrorCount: number;
+  lastMeteringReadError: string | null;
   activeThresholdDb: number;
   speechThresholdDb: number;
   silenceThresholdDb: number;
   heardSpeech: boolean;
 };
 
+let latestCaptureDiagnostic: CaptureDiagnostic | null = null;
+
+function meteringResult(details: CaptureDiagnostic | null): string {
+  if (!details?.meteringReceived) return 'no-sample';
+  if (details.lastMeteringReadError) return 'read-error-fallback';
+  if (details.lastMeteringDb === -160) return 'zero-amplitude';
+  return 'measured';
+}
+
 function logCaptureDiagnostic(details: CaptureDiagnostic): void {
+  latestCaptureDiagnostic = details;
   const level = (value: number | null) =>
     value === null || !Number.isFinite(value) ? 'n/a' : value.toFixed(1);
   recordDiagnostic(
@@ -81,6 +107,8 @@ function logCaptureDiagnostic(details: CaptureDiagnostic): void {
     `mode=${details.mode}; endReason=${details.endReason}; recording=${details.recording}; ` +
       `durationMs=${details.durationMs}; meteringReceived=${details.meteringReceived}; ` +
       `lastMeteringDb=${level(details.lastMeteringDb)}; peakMeteringDb=${level(details.peakMeteringDb)}; ` +
+      `meteringResult=${meteringResult(details)}; meteringReadErrorCount=${details.meteringReadErrorCount}; ` +
+      `lastMeteringReadError=${details.lastMeteringReadError ?? 'none'}; ` +
       `activeThresholdDb=${level(details.activeThresholdDb)}; ` +
       `speechThresholdDb=${level(details.speechThresholdDb)}; ` +
       `silenceThresholdDb=${level(details.silenceThresholdDb)}; heardSpeech=${details.heardSpeech}`,
@@ -108,14 +136,17 @@ export async function startListening(recorder: AudioRecorder): Promise<void> {
     );
   }
 
+  latestCaptureDiagnostic = null;
   try {
     await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
     await recorder.prepareToRecordAsync();
     recorder.record();
-    const status = recorder.getStatus();
+    const status = getRecorderDiagnosticStatus(recorder);
     recordDiagnostic(
       'MICROPHONE RECORDING',
-      `recordCall=returned; active=${status.isRecording}; meteringAvailable=${typeof status.metering === 'number'}`,
+      `recordCall=returned; active=${status.isRecording}; ` +
+        `initialMeteringState=${typeof status.metering === 'number' ? 'reported' : 'not-reported-yet'}; ` +
+        `initialMeteringError=${safeMeteringError(status.meteringError)}`,
     );
   } catch (error) {
     recordDiagnostic('MICROPHONE START ERROR', `phase=prepare-or-record; ${safeVoiceDiagnosticError(error)}`);
@@ -159,11 +190,17 @@ export async function waitForSpeechEnd(
   let receivedMetering = false;
   let peakLevelDb = -160;
   let lastMeteringDb: number | null = null;
+  let meteringReadErrorCount = 0;
+  let lastMeteringReadError: string | null = null;
   let activeSpeechThresholdDb = silenceThresholdDb;
   let lastSpeechAt = Date.now();
 
   while (true) {
-    const status = recorder.getStatus();
+    const status = getRecorderDiagnosticStatus(recorder);
+    lastMeteringReadError = status.meteringError
+      ? safeMeteringError(status.meteringError)
+      : null;
+    if (lastMeteringReadError) meteringReadErrorCount += 1;
     const logEnd = (endReason: string) => logCaptureDiagnostic({
       mode: 'command',
       endReason,
@@ -172,6 +209,8 @@ export async function waitForSpeechEnd(
       meteringReceived: receivedMetering,
       lastMeteringDb,
       peakMeteringDb: peakLevelDb,
+      meteringReadErrorCount,
+      lastMeteringReadError,
       activeThresholdDb: activeSpeechThresholdDb,
       speechThresholdDb,
       silenceThresholdDb,
@@ -237,12 +276,18 @@ export async function waitForWakeWordCandidate(
   let receivedMetering = false;
   let peakLevelDb = -160;
   let lastMeteringDb: number | null = null;
+  let meteringReadErrorCount = 0;
+  let lastMeteringReadError: string | null = null;
   let activeSpeechThresholdDb = silenceThresholdDb;
   let lastSpeechAt = Date.now();
   const meteringSamples: number[] = [];
 
   while (true) {
-    const status = recorder.getStatus();
+    const status = getRecorderDiagnosticStatus(recorder);
+    lastMeteringReadError = status.meteringError
+      ? safeMeteringError(status.meteringError)
+      : null;
+    if (lastMeteringReadError) meteringReadErrorCount += 1;
     const logEnd = (endReason: string) => logCaptureDiagnostic({
       mode: 'wake-word',
       endReason,
@@ -251,6 +296,8 @@ export async function waitForWakeWordCandidate(
       meteringReceived: receivedMetering,
       lastMeteringDb,
       peakMeteringDb: peakLevelDb,
+      meteringReadErrorCount,
+      lastMeteringReadError,
       activeThresholdDb: activeSpeechThresholdDb,
       speechThresholdDb,
       silenceThresholdDb,
@@ -395,7 +442,9 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-async function recordingToBase64(uri: string): Promise<{ audioBase64: string; mimeType: string }> {
+async function recordingToBase64(
+  uri: string,
+): Promise<{ audioBase64: string; mimeType: string; fileSizeBytes: number }> {
   try {
     if (Platform.OS === 'web') {
       const response = await fetch(uri);
@@ -409,6 +458,7 @@ async function recordingToBase64(uri: string): Promise<{ audioBase64: string; mi
       return {
         audioBase64: await blobToBase64(blob),
         mimeType: recordingMimeType(uri, blob.type),
+        fileSizeBytes: blob.size,
       };
     }
 
@@ -421,6 +471,7 @@ async function recordingToBase64(uri: string): Promise<{ audioBase64: string; mi
         encoding: LegacyFileSystem.EncodingType.Base64,
       }),
       mimeType: recordingMimeType(uri),
+      fileSizeBytes: info.size,
     };
   } catch (error) {
     recordDiagnostic(
@@ -445,6 +496,17 @@ export async function stopListeningAndTranscribe(
     }
     phase = 'read-recording';
     const recording = await recordingToBase64(recorder.uri);
+    const capture = latestCaptureDiagnostic;
+    recordDiagnostic(
+      'MICROPHONE RECORDING FILE',
+      `platform=${Platform.OS}; sizeBytes=${recording.fileSizeBytes}; ` +
+        `meteringResult=${meteringResult(capture)}; ` +
+        `meteringReceived=${capture?.meteringReceived ?? false}; ` +
+        `lastMeteringDb=${capture?.lastMeteringDb?.toFixed(1) ?? 'n/a'}; ` +
+        `peakMeteringDb=${capture?.peakMeteringDb.toFixed(1) ?? 'n/a'}; ` +
+        `meteringReadErrorCount=${capture?.meteringReadErrorCount ?? 0}; ` +
+        `lastMeteringReadError=${capture?.lastMeteringReadError ?? 'none'}`,
+    );
     phase = 'transcribe-request';
     recordDiagnostic(
       'TRANSCRIBE FLOW',

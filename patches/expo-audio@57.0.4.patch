@@ -1,0 +1,43 @@
+diff --git a/android/src/main/java/expo/modules/audio/AudioRecorder.kt b/android/src/main/java/expo/modules/audio/AudioRecorder.kt
+index 9a7683666fe0838b21ed4b8502b91d151f76d601..9a35ab21fb5ce7b9caff0933df9d9c4f5dc40893 100644
+--- a/android/src/main/java/expo/modules/audio/AudioRecorder.kt
++++ b/android/src/main/java/expo/modules/audio/AudioRecorder.kt
+@@ -38,6 +38,7 @@ class AudioRecorder(
+   MediaRecorder.OnInfoListener {
+   var filePath: String? = null
+   private var meteringEnabled = options.isMeteringEnabled
++  private var meteringReadError: String? = null
+   private var durationAlreadyRecorded = 0L
+   var isPrepared = false
+ 
+@@ -61,16 +62,18 @@ class AudioRecorder(
+ 
+   private fun getAudioRecorderLevels(): Double? {
+     if (!meteringEnabled || recorder == null || !isRecording) {
++      meteringReadError = null
+       return null
+     }
+ 
+     val amplitude: Int = try {
+-      recorder?.maxAmplitude ?: 0
+-    } catch (_: Exception) {
++      (recorder?.maxAmplitude ?: 0).also { meteringReadError = null }
++    } catch (error: Exception) {
+       // MediaRecorder maxAmplitude can throw various exceptions:
+       // - IllegalStateException: invalid recorder state/race condition
+       // - RuntimeException: getMaxAmplitude failed (hardware/driver issues)
+       // We return 0 (silence) as fallback for any amplitude reading failure
++      meteringReadError = error.javaClass.simpleName
+       0
+     }
+     return if (amplitude == 0) {
+@@ -313,6 +316,9 @@ class AudioRecorder(
+       getAudioRecorderLevels()?.let {
+         putDouble("metering", it)
+       }
++      meteringReadError?.let {
++        putString("meteringError", it)
++      }
+       currentFileUrl()?.let { putString("url", it) }
+     }
+   } else {
