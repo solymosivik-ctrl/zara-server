@@ -8,13 +8,33 @@ import { logger } from "../lib/logger";
 export type VoiceAudio = { audioBase64: string; mimeType: string };
 export interface VoiceEngine {
   warmup?(): Promise<void>;
-  synthesize(text: string): Promise<VoiceAudio>;
+  synthesize(text: string, jobId?: string): Promise<VoiceAudio>;
   close(): void;
 }
 
 const engineError = () => new Error(
   "Zara saját hangja most nem érhető el. A szöveges válasz megmaradt.",
 );
+
+function diagnosticError(value: unknown): Error | null {
+  if (!value || typeof value !== "object") return null;
+  const detail = value as { type?: unknown; message?: unknown };
+  if (typeof detail.message !== "string") return null;
+  const error = new Error(detail.message.slice(0, 180));
+  if (typeof detail.type === "string" && /^[a-zA-Z0-9_.-]{1,60}$/.test(detail.type)) {
+    error.name = detail.type;
+  }
+  return error;
+}
+
+function safeErrorMessage(error: unknown): string {
+  return (error instanceof Error ? error.message : "Unknown error")
+    .replace(/(?:https?|file|content):\/\/\S+/gi, "[uri omitted]")
+    .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/\b[A-Za-z0-9+/=_-]{64,}\b/g, "[data omitted]")
+    .replace(/(?:[A-Za-z]:\\|\/)[^\s'"]+/g, "[path omitted]")
+    .slice(0, 180);
+}
 
 function workspaceRoot(): string {
   let directory = process.cwd();
@@ -68,7 +88,7 @@ export class LocalVoiceEngine implements VoiceEngine {
             this.readyReject = null;
             logger.info("Zara approved reference voice engine ready");
           } else if (message.event === "fatal") {
-            this.fail();
+            this.fail(diagnosticError(message.diagnosticError) ?? engineError());
           } else if (this.current && message.id === this.current.id) {
             const current = this.current;
             this.current = null;
@@ -79,7 +99,7 @@ export class LocalVoiceEngine implements VoiceEngine {
                 message.mimeType === "audio/mpeg") {
               current.resolve({ audioBase64: message.audioBase64, mimeType: message.mimeType });
             } else {
-              current.reject(engineError());
+              current.reject(diagnosticError(message.diagnosticError) ?? engineError());
             }
           }
         } catch { this.fail(); }
@@ -100,28 +120,48 @@ export class LocalVoiceEngine implements VoiceEngine {
     return this.start();
   }
 
-  async synthesize(text: string): Promise<VoiceAudio> {
-    await this.start();
-    if (!this.child || this.current) throw engineError();
-    return new Promise<VoiceAudio>((resolve, reject) => {
-      const id = randomUUID();
-      const timer = setTimeout(() => this.fail(), 12 * 60_000);
-      timer.unref();
-      this.current = { id, resolve, reject, timer };
-      this.child!.stdin.write(`${JSON.stringify({ id, text })}\n`);
-    });
+  async synthesize(text: string, jobId = "unknown"): Promise<VoiceAudio> {
+    const startedAt = Date.now();
+    logger.info({ jobId }, "Approved Zara speech synthesis started");
+    try {
+      await this.start();
+      if (!this.child || this.current) throw engineError();
+      const audio = await new Promise<VoiceAudio>((resolve, reject) => {
+        const id = randomUUID();
+        const timer = setTimeout(() => this.fail(), 12 * 60_000);
+        timer.unref();
+        this.current = { id, resolve, reject, timer };
+        this.child!.stdin.write(`${JSON.stringify({ id, text })}\n`);
+      });
+      logger.info({
+        jobId,
+        durationMs: Date.now() - startedAt,
+        mimeType: audio.mimeType,
+        audioBase64Chars: audio.audioBase64.length,
+        audioBytes: Buffer.byteLength(audio.audioBase64, "base64"),
+      }, "Approved Zara speech synthesis completed");
+      return audio;
+    } catch (error) {
+      logger.error({
+        jobId,
+        durationMs: Date.now() - startedAt,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorMessage: safeErrorMessage(error),
+      }, "Approved Zara speech synthesis failed");
+      throw error;
+    }
   }
 
-  private fail(): void {
+  private fail(error = engineError()): void {
     const child = this.child;
     this.child = null;
-    this.readyReject?.(engineError());
+    this.readyReject?.(error);
     this.readyResolve = null;
     this.readyReject = null;
     this.ready = null;
     if (this.current) {
       clearTimeout(this.current.timer);
-      this.current.reject(engineError());
+      this.current.reject(error);
       this.current = null;
     }
     child?.kill("SIGTERM");

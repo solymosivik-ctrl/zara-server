@@ -92,7 +92,7 @@ export class VoiceJobs {
         }
         job.status = "processing";
         try {
-          const audio = await this.engine.synthesize(job.text);
+          const audio = await this.engine.synthesize(job.text, job.id);
           // Cancelling never resurrects a job or plays its late audio.
           if ((job.status as JobStatus) === "processing") {
             job.status = "completed";

@@ -10,6 +10,7 @@ from io import BytesIO
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -23,6 +24,17 @@ CACHE = ROOT / ".cache" / "zara-voice" / "approved-v1"
 def emit(value):
     sys.stdout.write(json.dumps(value, ensure_ascii=False) + "\n")
     sys.stdout.flush()
+
+
+def safe_diagnostic_error(exc, text=None):
+    message = str(exc) or type(exc).__name__
+    if isinstance(text, str) and text:
+        message = message.replace(text, "[response text omitted]")
+    message = re.sub(r"(?:https?|file|content)://\S+", "[uri omitted]", message, flags=re.IGNORECASE)
+    message = re.sub(r"\bBearer\s+\S+", "Bearer [redacted]", message, flags=re.IGNORECASE)
+    message = re.sub(r"\b[A-Za-z0-9+/=_-]{64,}\b", "[data omitted]", message)
+    message = re.sub(r"(?:[A-Za-z]:\\|/)[^\s'\"<>]+", "[path omitted]", message)
+    return {"type": type(exc).__name__[:60], "message": message[:180]}
 
 
 def main():
@@ -58,12 +70,17 @@ def main():
                     vocab_file=str(cache / "model/vocab.txt"),
                     vocoder_local_path=str(cache / "vocoder"), device="cpu", use_ema=True,
                 )
-        except Exception:
-            emit({"event": "fatal", "message": "Zara saját hangmotorja nem indítható. A szöveges válasz elérhető."})
+        except Exception as exc:
+            emit({
+                "event": "fatal",
+                "message": "Zara saját hangmotorja nem indítható. A szöveges válasz elérhető.",
+                "diagnosticError": safe_diagnostic_error(exc),
+            })
             return 1
         emit({"event": "ready"})
         for line in sys.stdin:
             request_id = None
+            text = None
             try:
                 request = json.loads(line)
                 request_id = request["id"]
@@ -95,12 +112,14 @@ def main():
                 emit({"id": request_id, "ok": True,
                       "audioBase64": base64.b64encode(encoded).decode("ascii"),
                       "mimeType": "audio/mpeg"})
-            except ValueError:
+            except ValueError as exc:
                 emit({"id": request_id, "ok": False,
-                      "message": "Zara saját hangja ezt a szöveget nem tudta felolvasni. A szöveges válasz megmaradt."})
-            except Exception:
+                      "message": "Zara saját hangja ezt a szöveget nem tudta felolvasni. A szöveges válasz megmaradt.",
+                      "diagnosticError": safe_diagnostic_error(exc, text)})
+            except Exception as exc:
                 emit({"id": request_id, "ok": False,
-                      "message": "Zara saját hangjának előállítása nem sikerült. A szöveges válasz megmaradt."})
+                      "message": "Zara saját hangjának előállítása nem sikerült. A szöveges válasz megmaradt.",
+                      "diagnosticError": safe_diagnostic_error(exc, text)})
     return 0
 
 

@@ -539,9 +539,19 @@ export async function stopListeningAndTranscribe(
   }
 }
 
-function logSpeakResponse(stage: string, value: unknown): void {
+function logSpeakResponse(
+  stage: string,
+  value: unknown,
+  httpStatus: number | null,
+  requestedJobId?: string,
+): void {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    recordDiagnostic('SPEAK RESPONSE', `stage=${stage}; parsed=${value === null ? 'null' : typeof value}`);
+    recordDiagnostic(
+      'SPEAK RESPONSE',
+      `stage=${stage}; httpStatus=${httpStatus ?? 'none'}; jobId=${requestedJobId ?? 'none'}; ` +
+        `state=missing-or-unknown; audioBase64Present=false; audioBase64Chars=0; ` +
+        `error=response-${value === null ? 'null' : typeof value}`,
+    );
     return;
   }
   const data = value as Record<string, unknown>;
@@ -550,15 +560,21 @@ function logSpeakResponse(stage: string, value: unknown): void {
   ]);
   const keys = Object.keys(data).filter((key) => allowedKeys.has(key)).sort();
   const audioBase64 = typeof data.audioBase64 === 'string' ? data.audioBase64 : '';
-  const status = ['queued', 'processing', 'completed', 'failed', 'cancelled'].includes(
+  const state = ['queued', 'processing', 'completed', 'failed', 'cancelled'].includes(
     String(data.status),
   ) ? data.status : 'missing-or-unknown';
+  const jobId = typeof data.jobId === 'string' ? data.jobId : requestedJobId ?? 'none';
+  const message = typeof data.message === 'string'
+    ? sanitizeSpeechError(new Error(data.message)).message || 'none'
+    : 'none';
   recordDiagnostic(
     'SPEAK RESPONSE',
-    `stage=${stage}; keys=${keys.join(',') || '(none)'}; status=${String(status)}; ` +
+    `stage=${stage}; httpStatus=${httpStatus ?? 'none'}; keys=${keys.join(',') || '(none)'}; ` +
+      `jobId=${jobId}; state=${String(state)}; retryAfterMs=` +
+      `${typeof data.retryAfterMs === 'number' ? data.retryAfterMs : 'none'}; ` +
       `mimeType=${data.mimeType === 'audio/mpeg' ? 'audio/mpeg' : 'missing-or-other'}; ` +
       `audioBase64Present=${audioBase64.length > 0}; audioBase64Chars=${audioBase64.length}; ` +
-      `jobIdPresent=${typeof data.jobId === 'string' && data.jobId.length > 0}`,
+      `error=${message}`,
   );
 }
 
@@ -579,6 +595,32 @@ function sanitizeSpeechError(error: unknown): { name: string; status: string; me
   return { name, status, message };
 }
 
+async function requestSpeak(
+  request: Parameters<typeof zaraSpeak>[0],
+  stage: string,
+): Promise<SpeakResponseLike> {
+  let httpStatus: number | null = null;
+  const requestedJobId = typeof request.jobId === 'string' ? request.jobId : undefined;
+  try {
+    const response = await zaraSpeak(request, {
+      onResponse: ({ status }) => {
+        httpStatus = status;
+      },
+    }) as unknown as SpeakResponseLike;
+    logSpeakResponse(stage, response, httpStatus, requestedJobId);
+    return response;
+  } catch (error) {
+    const safe = sanitizeSpeechError(error);
+    recordDiagnostic(
+      'SPEAK RESPONSE',
+      `stage=${stage}; httpStatus=${httpStatus ?? safe.status}; jobId=${requestedJobId ?? 'none'}; ` +
+        `state=unavailable; retryAfterMs=none; audioBase64Present=false; audioBase64Chars=0; ` +
+        `error=${safe.message || safe.name}`,
+    );
+    throw error;
+  }
+}
+
 export async function speak(
   text: string,
   options: SpeechOptions,
@@ -587,13 +629,14 @@ export async function speak(
   if (options.provider === 'sample') {
     let phase = 'start-request';
     let generatedFile: File | null = null;
+    let activeJobId: string | undefined;
     try {
-      let response = await zaraSpeak({
+      let response = await requestSpeak({
         text,
         language: options.language === 'hu-HU' ? 'hu' : 'en',
         async: true,
-      }) as unknown as SpeakResponseLike;
-      logSpeakResponse('start', response);
+      }, 'start');
+      if (typeof response.jobId === 'string') activeJobId = response.jobId;
 
       const deadline = Date.now() + 15 * 60_000;
       while (isSpeakJobPending(response)) {
@@ -601,24 +644,48 @@ export async function speak(
         if (typeof response.jobId !== 'string' || !response.jobId || Date.now() > deadline) {
           throw new Error('Zara saját hangjának előállítása túl sokáig tart. A szöveges válasz megmaradt.');
         }
+        const jobId = response.jobId;
+        activeJobId = jobId;
         const delay = Math.min(
           3_000,
           Math.max(500, typeof response.retryAfterMs === 'number' ? response.retryAfterMs : 1_500),
         );
         await wait(delay);
         phase = 'poll-request';
-        response = await zaraSpeak({
+        response = await requestSpeak({
           text,
           language: options.language === 'hu-HU' ? 'hu' : 'en',
           async: true,
-          jobId: response.jobId,
-        }) as unknown as SpeakResponseLike;
-        logSpeakResponse('poll', response);
+          jobId,
+        }, 'poll');
+        if (typeof response.jobId === 'string') activeJobId = response.jobId;
       }
 
       phase = 'validate-response';
+      const receivedAudioBase64 =
+        response && typeof response === 'object' && typeof response.audioBase64 === 'string'
+          ? response.audioBase64
+          : '';
+      const receivedMimeType =
+        response && typeof response === 'object' && typeof response.mimeType === 'string'
+          ? response.mimeType
+          : 'missing';
+      recordDiagnostic(
+        'SPEAK AUDIO RECEIVED',
+        `jobId=${activeJobId ?? 'none'}; mimeType=${receivedMimeType}; ` +
+          `audioBase64Present=${receivedAudioBase64.length > 0}; ` +
+          `audioBase64Chars=${receivedAudioBase64.length}`,
+      );
+      recordDiagnostic(
+        'AUDIO BASE64 VALIDATION',
+        `result=start; jobId=${activeJobId ?? 'none'}; chars=${receivedAudioBase64.length}`,
+      );
       const parsedAudio = parseSpeakAudioResponse(response);
       if (!parsedAudio.ok) {
+        recordDiagnostic(
+          'AUDIO BASE64 VALIDATION',
+          `result=failed; jobId=${activeJobId ?? 'none'}; reason=${parsedAudio.reason}`,
+        );
         recordDiagnostic('SPEAK VALIDATION', parsedAudio.reason);
         throw new Error(
           typeof response.message === 'string'
@@ -626,12 +693,28 @@ export async function speak(
             : 'Zara saját hangja nem készült el. A szöveges válasz megmaradt.',
         );
       }
+      recordDiagnostic(
+        'AUDIO BASE64 VALIDATION',
+        `result=success; jobId=${activeJobId ?? 'none'}; decodedBytes=${parsedAudio.audioBytes.byteLength}`,
+      );
 
       let audioUri: string;
       if (Platform.OS === 'web') {
+        recordDiagnostic(
+          'AUDIO FILE WRITE START',
+          `platform=web; jobId=${activeJobId ?? 'none'}; mode=data-uri; fileWrite=not-applicable`,
+        );
         audioUri = `data:audio/mpeg;base64,${parsedAudio.audioBase64}`;
+        recordDiagnostic(
+          'AUDIO FILE WRITE SUCCESS',
+          `platform=web; jobId=${activeJobId ?? 'none'}; fileWrite=not-applicable; dataUriCreated=true`,
+        );
       } else {
         phase = 'write-mp3';
+        recordDiagnostic(
+          'AUDIO FILE WRITE START',
+          `platform=${Platform.OS}; jobId=${activeJobId ?? 'none'}; bytes=${parsedAudio.audioBytes.byteLength}`,
+        );
         const audioFile = new File(Paths.cache, `zara-response-${++speechSequence}.mp3`);
         generatedFile = audioFile;
         if (audioFile.exists) audioFile.delete();
@@ -641,8 +724,8 @@ export async function speak(
           throw new Error('A generált MP3-fájl mentése nem sikerült.');
         }
         recordDiagnostic(
-          'SPEAK AUDIO',
-          `decodedMp3Bytes=${parsedAudio.audioBytes.byteLength}; ` +
+          'AUDIO FILE WRITE SUCCESS',
+          `jobId=${activeJobId ?? 'none'}; decodedMp3Bytes=${parsedAudio.audioBytes.byteLength}; ` +
             `cacheFileCreated=${audioFile.exists}; cacheFileBytes=${audioFile.size}`,
         );
         audioUri = audioFile.uri;
@@ -651,13 +734,29 @@ export async function speak(
       phase = 'set-playback-mode';
       await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
       phase = 'player-replace';
+      recordDiagnostic(
+        'AUDIO PLAYER REPLACE',
+        `result=calling; platform=${Platform.OS}; jobId=${activeJobId ?? 'none'}`,
+      );
       player.replace(audioUri);
       recordDiagnostic('SPEAK AUDIO', `player=replace; platform=${Platform.OS}`);
+      recordDiagnostic(
+        'AUDIO PLAYER REPLACE',
+        `result=call-returned; platform=${Platform.OS}; jobId=${activeJobId ?? 'none'}`,
+      );
       phase = 'set-playback-rate';
       player.setPlaybackRate(options.speed ?? 1);
       phase = 'player-play';
+      recordDiagnostic(
+        'AUDIO PLAYER PLAY',
+        `result=calling; platform=${Platform.OS}; jobId=${activeJobId ?? 'none'}`,
+      );
       player.play();
       recordDiagnostic('SPEAK AUDIO', `player=play-called; platform=${Platform.OS}`);
+      recordDiagnostic(
+        'AUDIO PLAYER PLAY',
+        `result=call-returned; platform=${Platform.OS}; jobId=${activeJobId ?? 'none'}`,
+      );
       try {
         if (previousSpeechFile?.exists) previousSpeechFile.delete();
       } catch {
@@ -669,7 +768,7 @@ export async function speak(
       const safe = sanitizeSpeechError(error);
       recordDiagnostic(
         'SPEAK FLOW ERROR',
-        `phase=${phase}; error=${safe.name}; httpStatus=${safe.status}` +
+        `phase=${phase}; jobId=${activeJobId ?? 'none'}; error=${safe.name}; httpStatus=${safe.status}` +
           (safe.message ? `; message=${safe.message}` : ''),
       );
       throw error;
