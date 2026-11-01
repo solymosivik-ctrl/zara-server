@@ -138,6 +138,16 @@ export default function HomeScreen() {
   const latestMessage = current?.messages[current.messages.length - 1];
   const diagnostics = useApiDiagnostics();
   const lastPlayerDiagnosticRef = useRef('');
+  const playerCreateLoggedRef = useRef(false);
+
+  useEffect(() => {
+    if (playerCreateLoggedRef.current) return;
+    playerCreateLoggedRef.current = true;
+    recordDiagnostic(
+      'AUDIO PLAYER CREATE',
+      `platform=${Platform.OS}; source=useAudioPlayer; initialized=true`,
+    );
+  }, [speechPlayer]);
 
   useEffect(() => {
     const state = {
@@ -159,6 +169,9 @@ export default function HomeScreen() {
           .replace(/(?:[A-Za-z]:\\|\/)[^\s'"]+/g, '[path omitted]')
           .slice(0, 180)
       : 'none';
+    if (state.error) {
+      recordDiagnostic('AUDIO PLAYER ERROR', `message=${safeError}`);
+    }
     recordDiagnostic(
       'AUDIO PLAYER',
       `loaded=${state.loaded}; playing=${state.playing}; finished=${state.finished}; error=${safeError}`,

@@ -1,5 +1,6 @@
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
+  onResponse?: (response: { status: number; contentType: string | null }) => void;
 };
 
 export type ErrorType<T = unknown> = ApiError<T>;
@@ -398,7 +399,12 @@ export async function customFetch<T = unknown>(
   options: CustomFetchOptions = {},
 ): Promise<T> {
   input = applyBaseUrl(input);
-  const { responseType = "auto", headers: headersInit, ...init } = options;
+  const {
+    responseType = "auto",
+    headers: headersInit,
+    onResponse,
+    ...init
+  } = options;
 
   const method = resolveMethod(input, init.method);
 
@@ -464,6 +470,15 @@ export async function customFetch<T = unknown>(
       });
     }
     throw error;
+  }
+
+  try {
+    onResponse?.({
+      status: response.status,
+      contentType: response.headers.get("content-type"),
+    });
+  } catch {
+    // Response observers are diagnostic-only and must not affect requests.
   }
 
   if (!response.ok) {
