@@ -1,2 +1,2 @@
 - [pnpm dependency patches](pnpm-dependency-patches.md) — `pnpm patch-commit` can reserialize workspace config and refresh unrelated lockfile entries; review and trim its diff.
-- [Android Gradle verification](android-gradle-verification.md) — Expo Android compilation may lose its Gradle daemon during setup; confirm the native module task actually runs before reporting success.
+- [Android Gradle verification](android-gradle-verification.md) — Check root-overlay capacity, cache integrity, and Android SDK tool symlinks before diagnosing Gradle failures.

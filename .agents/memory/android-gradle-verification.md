@@ -14,3 +14,9 @@ Expo 57 autolinking can use the published Expo Audio AAR instead of the patched 
 **Why:** A patched package file is not part of the native build if autolinking selects its prebuilt binary.
 
 **How to apply:** Before running a patched module's Kotlin task, inspect the Gradle project list and ensure autolinking selects the source module.
+
+In this workspace, `~/.gradle/caches` can fill the small root overlay even while the workspace volume has substantial free space. Keep the Gradle cache on the workspace-backed, ignored `.local` area and leave a symlink at the original path. Also verify Android SDK CMake/Ninja symlink targets before interpreting native build failures; stale Nix-store links can fail before project C++ compilation.
+
+**Why:** A full root overlay caused Gradle cache writes to fail and corrupted its file-access index; a later native build exposed missing CMake/Ninja targets from a stale SDK symlink.
+
+**How to apply:** Check `df -h` for both `/home/runner` and `/home/runner/workspace`, inspect cache size and `readlink -f` for SDK tools, and preserve cache/index data when relocating or recovering it.
