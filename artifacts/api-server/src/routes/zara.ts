@@ -867,10 +867,38 @@ router.post("/zara/speak", async (req, res) => {
       ? zaraVoiceJobs.poll(body.jobId, body.text, body.language, body.cancel)
       : zaraVoiceJobs.submit(body.text, body.language);
     if (!job) {
-      res.status(404).json({ message: "A hangkérés nem található vagy lejárt." });
+      const notFound = { message: "A hangkérés nem található vagy lejárt." };
+      if (body.jobId) {
+        req.log.info({
+          jobId: body.jobId,
+          httpStatus: 404,
+          status: "not-found",
+          fields: Object.keys(notFound),
+          audioBase64Present: false,
+          audioBase64Chars: 0,
+          mimeType: null,
+          responseJsonBytes: Buffer.byteLength(JSON.stringify(notFound)),
+        }, "Approved Zara voice polling response");
+      }
+      res.status(404).json(notFound);
       return;
     }
     const result = body.async || body.jobId ? job : await zaraVoiceJobs.wait(job.jobId);
+    if (body.jobId) {
+      const audioBase64 = typeof result.audioBase64 === "string" ? result.audioBase64 : "";
+      req.log.info({
+        jobId: result.jobId,
+        httpStatus: 200,
+        status: result.status,
+        fields: Object.keys(result).sort(),
+        retryAfterMs: result.retryAfterMs ?? null,
+        audioBase64Present: audioBase64.length > 0,
+        audioBase64Chars: audioBase64.length,
+        mimeType: result.mimeType ?? null,
+        messagePresent: typeof result.message === "string" && result.message.length > 0,
+        responseJsonBytes: Buffer.byteLength(JSON.stringify(result)),
+      }, "Approved Zara voice polling response");
+    }
     if (!body.async && !body.jobId) {
       const legacyResponse = toLegacySpeakResponse(result);
       if (!legacyResponse) {

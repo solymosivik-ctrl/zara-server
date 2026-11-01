@@ -14,6 +14,10 @@ export type VoiceJobResult = {
 const keyFor = (text: string, language: string) =>
   createHash("sha256").update(`approved-v1|${language}|${text.normalize("NFC").trim()}`).digest("hex");
 
+function logJobDiagnostic(event: string, fields: Record<string, unknown>): void {
+  console.info(JSON.stringify({ event, ...fields }));
+}
+
 export class VoiceJobs {
   private jobs = new Map<string, Job>();
   private queue: Job[] = [];
@@ -88,6 +92,10 @@ export class VoiceJobs {
         if (job.status !== "queued") continue;
         if (job.expires <= this.now()) {
           job.status = "failed"; job.text = ""; job.message = "A hangkérés várakozás közben lejárt.";
+            logJobDiagnostic("approved-zara-voice-job-expired", {
+              jobId: job.id,
+              status: job.status,
+            });
           continue;
         }
         job.status = "processing";
@@ -97,12 +105,25 @@ export class VoiceJobs {
           if ((job.status as JobStatus) === "processing") {
             job.status = "completed";
             job.audio = audio;
+            logJobDiagnostic("approved-zara-voice-job-completed", {
+              jobId: job.id,
+              status: job.status,
+              audioBase64Present: job.audio.audioBase64.length > 0,
+              audioBase64Chars: job.audio.audioBase64.length,
+              mimeType: job.audio.mimeType,
+              audioBytes: Buffer.byteLength(job.audio.audioBase64, "base64"),
+            });
             this.remember(job.key, audio);
           }
-        } catch {
+        } catch (error) {
           if ((job.status as JobStatus) === "processing") {
             job.status = "failed";
             job.message = "Zara saját hangjának előállítása nem sikerült. A szöveges válasz megmaradt.";
+            logJobDiagnostic("approved-zara-voice-job-failed", {
+              jobId: job.id,
+              status: job.status,
+              errorName: error instanceof Error ? error.name : "UnknownError",
+            });
           }
         } finally { job.text = ""; }
       }
