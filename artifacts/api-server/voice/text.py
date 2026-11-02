@@ -20,5 +20,5 @@ def prepare_text(text, vocabulary):
     unknown = set(text) - vocabulary
     if unknown:
         raise ValueError("A saját hangmodell ezt a szöveget még nem tudja biztonságosan kimondani.")
-    # Preserve the accepted lead-in and the complete reference-based approach.
-    return text if text.startswith("rendben.") else f"rendben. {text}"
+    # Pass only the processed assistant response to F5; do not add speech text.
+    return text
