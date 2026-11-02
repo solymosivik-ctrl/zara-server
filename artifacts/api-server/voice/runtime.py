@@ -15,6 +15,7 @@ import subprocess
 import sys
 
 from assets import ensure_assets
+from compile_control import CompileController, read_compile_options
 from text import prepare_text
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -42,6 +43,7 @@ def main():
     os.environ["MKL_NUM_THREADS"] = "4"
     with open(os.devnull, "w") as quiet:
         try:
+            compile_options = read_compile_options(os.environ)
             with redirect_stdout(quiet), redirect_stderr(quiet):
                 import numpy as np
                 import soundfile as sf
@@ -70,6 +72,25 @@ def main():
                     vocab_file=str(cache / "model/vocab.txt"),
                     vocoder_local_path=str(cache / "vocoder"), device="cpu", use_ema=True,
                 )
+                compile_controller = CompileController(
+                    model,
+                    compile_options["mode"],
+                    torch.compile,
+                    reset_fn=torch._dynamo.reset,
+                )
+                compile_controller.configure()
+
+                if compile_options["warmup"]:
+                    warmup_text = prepare_text("Szia, Zara.", vocabulary)
+                    with torch.inference_mode():
+                        warmup_result = compile_controller.run(lambda: model.infer(
+                            ref_file=str(cache / "reference.wav"),
+                            ref_text=reference_text,
+                            gen_text=warmup_text,
+                            nfe_step=32,
+                            seed=42,
+                        ))
+                    del warmup_result
         except Exception as exc:
             emit({
                 "event": "fatal",
@@ -77,7 +98,10 @@ def main():
                 "diagnosticError": safe_diagnostic_error(exc),
             })
             return 1
-        emit({"event": "ready"})
+        emit({
+            "event": "ready",
+            "compileDiagnostics": compile_controller.diagnostics(torch),
+        })
         for line in sys.stdin:
             request_id = None
             text = None
@@ -89,11 +113,11 @@ def main():
                     raise ValueError("Érvénytelen hangkérés.")
                 prepared = prepare_text(text, vocabulary)
                 with redirect_stdout(quiet), redirect_stderr(quiet), torch.inference_mode():
-                    audio, sr, _ = model.infer(
-                        ref_file=str(cache / "reference.wav"),
-                        ref_text=reference_text, gen_text=prepared,
-                        nfe_step=32, seed=42,
-                    )
+                    audio, sr, _ = compile_controller.run(lambda: model.infer(
+                            ref_file=str(cache / "reference.wav"),
+                            ref_text=reference_text, gen_text=prepared,
+                            nfe_step=32, seed=42,
+                        ))
                 audio = np.asarray(audio, dtype=np.float32)
                 if not len(audio) or not np.isfinite(audio).all():
                     raise RuntimeError("Invalid generated audio.")
@@ -111,15 +135,18 @@ def main():
                     raise RuntimeError("Empty encoded speech.")
                 emit({"id": request_id, "ok": True,
                       "audioBase64": base64.b64encode(encoded).decode("ascii"),
-                      "mimeType": "audio/mpeg"})
+                      "mimeType": "audio/mpeg",
+                      "compileDiagnostics": compile_controller.diagnostics(torch)})
             except ValueError as exc:
                 emit({"id": request_id, "ok": False,
                       "message": "Zara saját hangja ezt a szöveget nem tudta felolvasni. A szöveges válasz megmaradt.",
-                      "diagnosticError": safe_diagnostic_error(exc, text)})
+                      "diagnosticError": safe_diagnostic_error(exc, text),
+                      "compileDiagnostics": compile_controller.diagnostics(torch)})
             except Exception as exc:
                 emit({"id": request_id, "ok": False,
                       "message": "Zara saját hangjának előállítása nem sikerült. A szöveges válasz megmaradt.",
-                      "diagnosticError": safe_diagnostic_error(exc, text)})
+                      "diagnosticError": safe_diagnostic_error(exc, text),
+                      "compileDiagnostics": compile_controller.diagnostics(torch)})
     return 0
 
 

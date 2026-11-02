@@ -24,6 +24,16 @@ or Android device speech.
   `uv`, Python 3.13, and `ffmpeg` must be available to the build/runtime.
 - Setting `ZARA_F5_WARMUP=1` loads the model before the HTTP listener starts.
   This may add up to 180 seconds to startup; it does not synthesize a greeting.
+- The experimental CPU compile path is opt-in only:
+  `ZARA_F5_COMPILE_MODE=reduce-overhead`. The default is `eager`; no compile
+  setting is needed for the normal voice path. A first inference can spend over
+  a minute compiling and variable text lengths may create additional graphs.
+- `ZARA_F5_COMPILE_WARMUP=1` additionally synthesizes and discards one fixed,
+  short probe before the runtime reports ready. It requires compile mode and
+  can delay startup substantially. It does not alter the public API or persist
+  the probe audio. Any compile exception restores the original transformer and
+  retries that request once using Eager. To run this before the API begins
+  listening, set both `ZARA_F5_WARMUP=1` and `ZARA_F5_COMPILE_WARMUP=1`.
 
 ## API compatibility and latency
 
