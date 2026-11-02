@@ -1,0 +1,114 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "fxrlP4LKPuvQ7eyuIdTB0"
+uri = "file://generated-artifacts/zara-f5-phase4-ab-20261102/short_eager.wav"
+type = "audio"
+title = "Rövid szöveg — Eager WAV"
+description = "F5-TTS, jóváhagyott referencia, FP32, seed 42, NFE 32, CFG 2, 4 CPU-szál, 24 kHz mono PCM24."
+logical_id = "ba1622cb-6a8c-49ff-89fe-5d41f9b3bf82"
+content_hash = "sha256:5f9cf26ebe3644d80cbb564fe95d932ef1aff20c808502d6e086c2199ded6c7f"
+size = 80684
+mtime_ms = 1793606444778
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/ba1622cb-6a8c-49ff-89fe-5d41f9b3bf82/431753aa-62d9-4117-9372-6049169b1638"
+storage_version_token = "1793607165299558"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "8Wn83P4JQ3vRNfNaKpkj6"
+uri = "file://generated-artifacts/zara-f5-phase4-ab-20261102/short_compile.wav"
+type = "audio"
+title = "Rövid szöveg — Reduce-overhead WAV"
+description = "Az Eager mintával azonos szöveg, referencia és beállítások; kizárólag a tesztfolyamatban fordított transformer."
+logical_id = "00b7ba56-e3a2-4516-bc7b-769b6100be36"
+content_hash = "sha256:1bd292b2f72cfc5f32da8c0ec9eb319b8b5d47ccb22efb7534146fcd77fb6216"
+size = 80684
+mtime_ms = 1793606761254
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/00b7ba56-e3a2-4516-bc7b-769b6100be36/30017c50-fee1-4574-82fe-e72b56a69f99"
+storage_version_token = "1793607166082509"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "u4c6LiqCe4zrRxZp9yQHX"
+uri = "file://generated-artifacts/zara-f5-phase4-ab-20261102/medium_eager.wav"
+type = "audio"
+title = "Közepes szöveg — Eager WAV"
+description = "F5-TTS A/B minta, jóváhagyott referencia, seed 42, NFE 32, CFG 2, 4 CPU-szál, 24 kHz mono PCM24."
+logical_id = "d0816dc4-f729-4513-be6c-742592aaa534"
+content_hash = "sha256:32cb5d244b5a15cdf86b459ad08fbc0a6e45c57108c39a5a2e890bbe36cf94d0"
+size = 298796
+mtime_ms = 1793606522894
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/d0816dc4-f729-4513-be6c-742592aaa534/04dfe0a9-6a73-42f2-88ee-0263ebc8e47a"
+storage_version_token = "1793607166885557"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "7w7-gE5T34GoxwF9sDP_e"
+uri = "file://generated-artifacts/zara-f5-phase4-ab-20261102/medium_compile.wav"
+type = "audio"
+title = "Közepes szöveg — Reduce-overhead WAV"
+description = "A közepes Eager mintával azonos szöveg és beállítások."
+logical_id = "c260ed28-c35c-443a-ab88-3a4899c3422c"
+content_hash = "sha256:0f7c4ed80677475a0d56bdb02dce5038d554d591eb2b9244eb94fd26b7022efe"
+size = 298796
+mtime_ms = 1793606897582
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/c260ed28-c35c-443a-ab88-3a4899c3422c/88dc95ac-b7c0-4736-b7d7-6b78f9e3a2bc"
+storage_version_token = "1793607167668327"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "2DIhIJ6dkGLdF5glnX29N"
+uri = "file://generated-artifacts/zara-f5-phase4-ab-20261102/long_eager.wav"
+type = "audio"
+title = "Hosszabb szöveg — Eager WAV"
+description = "Kb. 140 karakteres minta; F5-TTS, seed 42, NFE 32, CFG 2, 4 CPU-szál, 24 kHz mono PCM24."
+logical_id = "a0b2d5c0-3dce-48c1-9038-3fbf5ba025f3"
+content_hash = "sha256:3741d50aebb9495f66652904c2dc11e23d08c71b4bec91c40f9de3c26119c1a5"
+size = 648236
+mtime_ms = 1793606651490
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/a0b2d5c0-3dce-48c1-9038-3fbf5ba025f3/b2306c70-43ed-440c-a519-00bf18187a43"
+storage_version_token = "1793607168474580"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "GrF08D9w0iZYkSMrH62F-"
+uri = "file://generated-artifacts/zara-f5-phase4-ab-20261102/long_compile.wav"
+type = "audio"
+title = "Hosszabb szöveg — Reduce-overhead WAV"
+description = "A hosszabb Eager mintával azonos szöveg és beállítások."
+logical_id = "7d9e1c87-f03c-405b-a31d-9b9023140c69"
+content_hash = "sha256:ca38e20ff149345cab08977f7b7cb1955c64fe5b65b8097ff41edd6f263560d8"
+size = 648236
+mtime_ms = 1793607006226
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/7d9e1c87-f03c-405b-a31d-9b9023140c69/30188b6d-c664-4f12-83db-5a597dd6ccda"
+storage_version_token = "1793607169344321"
+content_type = "audio/wav"
+
+[[outputs]]
+id = "wTo3IHw7EH8fzJNWCRu6T"
+uri = "file://generated-artifacts/zara-f5-phase4-ab-20261102/comparison.csv"
+type = "table"
+title = "Eager és reduce-overhead összehasonlító jelentés"
+description = "A hat WAV hossz-, RMS-, peak-, csend- és számszerű eltérésmérései."
+logical_id = "77d34b87-ed80-41a4-816b-42497d18cadf"
+content_hash = "sha256:bc5db773a176929fe8659a2213edaf073c9733788d6b5a4e1c1a0e4d85920096"
+size = 2094
+mtime_ms = 1793607126468
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/77d34b87-ed80-41a4-816b-42497d18cadf/5f57a3ac-8127-4512-a91d-d27f9f8b891d"
+storage_version_token = "1793607170146966"
+content_type = "text/csv"
+
+[[outputs]]
+id = "2y8FUEzgQLY1FAHIzgCfX"
+uri = "file://generated-artifacts/zara-f5-phase4-ab-20261102/comparison.txt"
+type = "text"
+title = "A/B mérések emberileg olvasható jelentése"
+description = "Rövid összesítés a hat mintáról, a csendküszöbről és a korlátokról."
+logical_id = "0b1b21a4-1b70-4b6f-9708-d66e1e50234b"
+content_hash = "sha256:3f0fda0375f86d0f34b687748230c71736b6229c13fbde5e9aab91753867949a"
+size = 2734
+mtime_ms = 1793607126468
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/0b1b21a4-1b70-4b6f-9708-d66e1e50234b/6fb172a7-7095-4336-b60f-8cd745b99910"
+storage_version_token = "1793607170883552"
+content_type = "text/plain"

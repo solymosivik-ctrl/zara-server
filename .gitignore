@@ -54,3 +54,6 @@ Thumbs.db
 *.jks
 *.keystore
 *.p12
+
+# Locally retained voice test outputs and other generated artifacts
+/generated-artifacts/
