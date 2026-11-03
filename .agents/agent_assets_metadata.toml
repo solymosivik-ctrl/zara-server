@@ -117,112 +117,112 @@ content_type = "text/plain"
 id = "6K27m3dFlkQBaRkXCrM73"
 uri = "file://generated-artifacts/zara-f5-download/model_last_final.safetensors.part001"
 type = "unspecified"
-title = "F5 modell — 1/8"
-description = "Letölthető Zara F5 fájl. Az eredeti App Storage-példány változatlan maradt."
+title = "model_last_final.safetensors.part001"
+description = "Kattintható letölthető melléklet."
 logical_id = "70613141-e80e-4540-83bf-7b8dcd6d625b"
 content_hash = "sha256:2ebf8798ec389ba4c953a66ba77f52c02b2771e6ad35e709bd3257bd200bf7e7"
 size = 90000000
 mtime_ms = 1793728714711
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/70613141-e80e-4540-83bf-7b8dcd6d625b/539d0aba-1df9-4811-acf6-3d104c62ae6f"
-storage_version_token = "1793728730054164"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/70613141-e80e-4540-83bf-7b8dcd6d625b/3d22390d-af21-4b68-9aa8-43ce21d1f058"
+storage_version_token = "1793733352453236"
 content_type = "application/octet-stream"
 
 [[outputs]]
 id = "mj4WP_xThs4EABou81orv"
 uri = "file://generated-artifacts/zara-f5-download/model_last_final.safetensors.part002"
 type = "unspecified"
-title = "F5 modell — 2/8"
-description = "Letölthető Zara F5 fájl. Az eredeti App Storage-példány változatlan maradt."
+title = "model_last_final.safetensors.part002"
+description = "Kattintható letölthető melléklet."
 logical_id = "e9fe8422-8e0b-47e3-a68d-b726918acc0c"
 content_hash = "sha256:1ea8fa1e58ea9b51905ee8df95328c6850dbec735a7eaf7448ce1e2725cf73c1"
 size = 90000000
 mtime_ms = 1793728714862
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/e9fe8422-8e0b-47e3-a68d-b726918acc0c/16fd1a16-3252-430f-a98a-710609494396"
-storage_version_token = "1793728732213840"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/e9fe8422-8e0b-47e3-a68d-b726918acc0c/897c350a-63d6-4d74-a64d-62101a8a59a5"
+storage_version_token = "1793733355331121"
 content_type = "application/octet-stream"
 
 [[outputs]]
 id = "4y7mYAM-B46cFUsdlk6k0"
 uri = "file://generated-artifacts/zara-f5-download/model_last_final.safetensors.part003"
 type = "unspecified"
-title = "F5 modell — 3/8"
-description = "Letölthető Zara F5 fájl. Az eredeti App Storage-példány változatlan maradt."
+title = "model_last_final.safetensors.part003"
+description = "Kattintható letölthető melléklet."
 logical_id = "01a888f2-edbb-4b9d-a80d-18df03ee7adc"
 content_hash = "sha256:88395aa65ced50975ef7ad14054baf38a0e544a7997b346f61f6a3e82f1c4ed9"
 size = 90000000
 mtime_ms = 1793728714993
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/01a888f2-edbb-4b9d-a80d-18df03ee7adc/6d741c42-821c-4d1b-9b71-d8dd71d867d2"
-storage_version_token = "1793728734574648"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/01a888f2-edbb-4b9d-a80d-18df03ee7adc/d50dc015-e3cd-4b11-a04a-6be65defe8c3"
+storage_version_token = "1793733358578764"
 content_type = "application/octet-stream"
 
 [[outputs]]
 id = "DYNm1ihW8OMPzRMjkBPzJ"
 uri = "file://generated-artifacts/zara-f5-download/model_last_final.safetensors.part004"
 type = "unspecified"
-title = "F5 modell — 4/8"
-description = "Letölthető Zara F5 fájl. Az eredeti App Storage-példány változatlan maradt."
+title = "model_last_final.safetensors.part004"
+description = "Kattintható letölthető melléklet."
 logical_id = "cbab2352-5038-4b99-8f0c-66c9fb195a7c"
 content_hash = "sha256:3868750d5f9eb49d750850720bf8fa803c2cd3aba2d1ae211a0579b5621396f1"
 size = 90000000
 mtime_ms = 1793728715120
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/cbab2352-5038-4b99-8f0c-66c9fb195a7c/75a8d1e5-f32e-4456-a579-5373dc5f9cd1"
-storage_version_token = "1793728736596940"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/cbab2352-5038-4b99-8f0c-66c9fb195a7c/cd9f5e24-e9f5-42da-98d8-edfc7c936fb2"
+storage_version_token = "1793733361633151"
 content_type = "application/octet-stream"
 
 [[outputs]]
 id = "S52YPRWpHowY03b38xf_k"
 uri = "file://generated-artifacts/zara-f5-download/model_last_final.safetensors.part005"
 type = "unspecified"
-title = "F5 modell — 5/8"
-description = "Letölthető Zara F5 fájl. Az eredeti App Storage-példány változatlan maradt."
+title = "model_last_final.safetensors.part005"
+description = "Kattintható letölthető melléklet."
 logical_id = "576f5b3d-8c69-4a04-b98d-2f610fd2b171"
 content_hash = "sha256:81b0033296abd2c0c74ac0e8d4fc4471f9fd740cd2f1e8d9274317f4c835cf3f"
 size = 90000000
 mtime_ms = 1793728715226
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/576f5b3d-8c69-4a04-b98d-2f610fd2b171/27d06586-0822-4e82-a8ff-3c61dc88952a"
-storage_version_token = "1793728738674514"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/576f5b3d-8c69-4a04-b98d-2f610fd2b171/4c9154a0-b8a2-495c-b4a0-3272b3a61bd5"
+storage_version_token = "1793733364780665"
 content_type = "application/octet-stream"
 
 [[outputs]]
 id = "pf4JZ3ztBiTP8QwqMThft"
 uri = "file://generated-artifacts/zara-f5-download/model_last_final.safetensors.part006"
 type = "unspecified"
-title = "F5 modell — 6/8"
-description = "Letölthető Zara F5 fájl. Az eredeti App Storage-példány változatlan maradt."
+title = "model_last_final.safetensors.part006"
+description = "Kattintható letölthető melléklet."
 logical_id = "07ca63e5-798f-4e68-81f2-23f626ebc4c4"
 content_hash = "sha256:ba69e86c62dd943bd56584e490124d9f4e2b76b63538b06407abd033dc6199d6"
 size = 90000000
 mtime_ms = 1793728715378
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/07ca63e5-798f-4e68-81f2-23f626ebc4c4/1de11af3-ec8e-494b-bfcf-1fcd8ec314be"
-storage_version_token = "1793728741169507"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/07ca63e5-798f-4e68-81f2-23f626ebc4c4/192aa3f6-701d-4600-9a13-1eb5a96fac1f"
+storage_version_token = "1793733368142645"
 content_type = "application/octet-stream"
 
 [[outputs]]
 id = "wV3N9KpSZYuWWe5cumgz3"
 uri = "file://generated-artifacts/zara-f5-download/model_last_final.safetensors.part007"
 type = "unspecified"
-title = "F5 modell — 7/8"
-description = "Letölthető Zara F5 fájl. Az eredeti App Storage-példány változatlan maradt."
+title = "model_last_final.safetensors.part007"
+description = "Kattintható letölthető melléklet."
 logical_id = "e18017ac-0624-4e61-8d14-5464d9b62acc"
 content_hash = "sha256:350f556d52ded5f952de3d3bec02e29673bb237f2a213df73d9f6ef538661344"
 size = 90000000
 mtime_ms = 1793728715648
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/e18017ac-0624-4e61-8d14-5464d9b62acc/c85fc4b3-bee3-434a-bdb8-220fe56cc813"
-storage_version_token = "1793728743738787"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/e18017ac-0624-4e61-8d14-5464d9b62acc/84d000c6-f323-4fbd-9297-37ee54251824"
+storage_version_token = "1793733370799409"
 content_type = "application/octet-stream"
 
 [[outputs]]
 id = "05HpytbGMaGeGGSzY5hgj"
 uri = "file://generated-artifacts/zara-f5-download/model_last_final.safetensors.part008"
 type = "unspecified"
-title = "F5 modell — 8/8"
-description = "Letölthető Zara F5 fájl. Az eredeti App Storage-példány változatlan maradt."
+title = "model_last_final.safetensors.part008"
+description = "Kattintható letölthető melléklet."
 logical_id = "202d0c52-a95d-4551-8058-1e6074b3b45f"
 content_hash = "sha256:1925edf42749b8ce6717c94fa71bc8920b95c7f2d4a10b54c29c37b135bad06a"
 size = 41699880
 mtime_ms = 1793728715726
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/202d0c52-a95d-4551-8058-1e6074b3b45f/3ff58b63-e06a-4d11-b806-20550a1d1c05"
-storage_version_token = "1793728745303668"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/202d0c52-a95d-4551-8058-1e6074b3b45f/b85fb05a-7447-452c-8e33-87fd53d6a176"
+storage_version_token = "1793733373568423"
 content_type = "application/octet-stream"
 
 [[outputs]]
@@ -230,39 +230,39 @@ id = "hB-vbrCJsWvEeorMnidXC"
 uri = "file://generated-artifacts/zara-f5-download/zara-f5-supporting-files.zip"
 type = "unspecified"
 title = "Zara F5 kiegészítő fájlok ZIP-ben"
-description = "Letölthető Zara F5 fájl. Az eredeti App Storage-példány változatlan maradt."
+description = "Kattintható letölthető melléklet."
 logical_id = "dc73f01a-fd08-4838-8cda-6b6dd30fd345"
 content_hash = "sha256:7c51d91ddd7cbcc5a5e1914e51be423362eab30e9cd1c3aa4cabad028542dddc"
 size = 54703352
 mtime_ms = 1793728717246
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/dc73f01a-fd08-4838-8cda-6b6dd30fd345/f9ff0870-2cd6-4ddc-91a3-2362ae58c183"
-storage_version_token = "1793728746774005"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/dc73f01a-fd08-4838-8cda-6b6dd30fd345/227401f8-fb31-435c-9f05-07f14e09dcbc"
+storage_version_token = "1793733349064190"
 content_type = "application/octet-stream"
 
 [[outputs]]
 id = "eEIeJ9T6iysDzjWNgBtXO"
 uri = "file://generated-artifacts/zara-f5-download/join-model-parts.ps1"
 type = "unspecified"
-title = "Frissített PowerShell modell-összefűző és SHA-256 ellenőrző"
-description = "A részeket csak a helyes SHA-256 ellenőrzése után teszi a model mappába; meglévő fájlokat nem ír felül."
+title = "join-model-parts.ps1"
+description = "Kattintható letölthető melléklet."
 logical_id = "09bc72bc-70e4-49c7-98eb-14cc40f74c23"
 content_hash = "sha256:efd64de5df057d1555c515d2f0a84d3172181d28abbdbdc1a04e1aa958f20d95"
 size = 1312
 mtime_ms = 1793728789752
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/09bc72bc-70e4-49c7-98eb-14cc40f74c23/2a305c6f-2e4a-4eee-a8ee-d3e2b829cb73"
-storage_version_token = "1793728816571524"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/09bc72bc-70e4-49c7-98eb-14cc40f74c23/9a1fd74e-8aa8-48d6-b9d0-45d9b7b51aef"
+storage_version_token = "1793733374485972"
 content_type = "application/octet-stream"
 
 [[outputs]]
 id = "dcXd8PioCE52HSlOeyQpf"
 uri = "file://generated-artifacts/zara-f5-download/README.txt"
 type = "text"
-title = "Zara F5 letöltési útmutató"
-description = "Lépések a támogatófájlok kicsomagolásához és a modellrészek ellenőrzött összefűzéséhez."
+title = "README.txt"
+description = "Kattintható letölthető melléklet."
 logical_id = "3115c8de-c9c2-4ff0-8ac0-dbfe8649368b"
 content_hash = "sha256:9d6d3c4a569927d839b559c4f9adfe2ae4662d12da1233665c0168285105dbe0"
 size = 510
 mtime_ms = 1793728803368
-storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/3115c8de-c9c2-4ff0-8ac0-dbfe8649368b/56e0b344-f477-4a2d-905c-c727273c26c0"
-storage_version_token = "1793728817360768"
+storage_uri = "gcs://replit-rams-assets-archer/rams/assets/repl:79be58f4-f9ef-4edf-a59a-7e64bd1dd6bf/3115c8de-c9c2-4ff0-8ac0-dbfe8649368b/68b431f3-fd0f-4281-abea-6db1590b18be"
+storage_version_token = "1793733375360313"
 content_type = "text/plain"
