@@ -41,7 +41,6 @@ externalPort = 80
 [[ports]]
 localPort = 19628
 externalPort = 3000
-exposeLocalhost = true
 
 [objectStorage]
 defaultBucketID = "replit-objstore-d9ac298f-d122-4f17-a143-4b14c0a40d63"
