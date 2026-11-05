@@ -66,6 +66,7 @@ const weatherFillerWords = new Set([
 function isWeatherFillerWord(word: string): boolean {
   const normalized = normalizeWeatherText(word);
   if (weatherFillerWords.has(normalized)) return true;
+  if (/^(?:lesz|fog)\p{L}*$/u.test(normalized)) return true;
   // Keep speech-recognition variants such as "holnapur" out of the place
   // phrase without maintaining a list of transcription mistakes.
   if (/^holnap\p{L}*$/u.test(normalized)) return true;

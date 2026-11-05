@@ -15,7 +15,24 @@ const keyFor = (text: string, language: string) =>
   createHash("sha256").update(`approved-v1|${language}|${text.normalize("NFC").trim()}`).digest("hex");
 
 function logJobDiagnostic(event: string, fields: Record<string, unknown>): void {
-  console.info(JSON.stringify({ event, ...fields }));
+  console.info(JSON.stringify({
+    timestampUtc: new Date().toISOString(),
+    event,
+    ...fields,
+  }));
+}
+
+function safeErrorMessage(error: unknown, requestText: string): string {
+  let message = error instanceof Error ? error.message : "Unknown error";
+  if (requestText) message = message.replaceAll(requestText, "[speech text omitted]");
+  return message
+    .replace(/(?:https?|file|content):\/\/\S+/gi, "[uri omitted]")
+    .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/\b(?:api[_-]?key|authorization)\s*[:=]\s*\S+/gi, "[credential omitted]")
+    .replace(/\b(?:sk|rk)-[A-Za-z0-9_-]{12,}\b/g, "[credential omitted]")
+    .replace(/\b[A-Za-z0-9+/=_-]{64,}\b/g, "[data omitted]")
+    .replace(/(?:[A-Za-z]:\\|\/)[^\s'"]+/g, "[path omitted]")
+    .slice(0, 180);
 }
 
 export class VoiceJobs {
@@ -123,6 +140,7 @@ export class VoiceJobs {
               jobId: job.id,
               status: job.status,
               errorName: error instanceof Error ? error.name : "UnknownError",
+              errorMessage: safeErrorMessage(error, job.text),
             });
           }
         } finally { job.text = ""; }

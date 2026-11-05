@@ -71,6 +71,32 @@ test("engine errors fail explicitly without a substitute voice", async () => {
   assert.equal(engine.calls.length, 1);
 });
 
+test("failed synthesis logs a sanitized reason without speech text or credentials", async () => {
+  const engine = new FakeEngine(); const jobs = new VoiceJobs(engine);
+  const originalInfo = console.info;
+  const logLines: string[] = [];
+  console.info = (...args: unknown[]) => logLines.push(args.join(" "));
+  try {
+    const spokenText = "Titkos felolvasandó mondat.";
+    const job = jobs.submit(spokenText, "hu");
+    engine.pending.shift()!.reject(
+      new Error(`codec failed for ${spokenText}; Bearer secret-token at /private/model.bin`),
+    );
+    await tick();
+    const failure = logLines.find((line) => line.includes("approved-zara-voice-job-failed"));
+    assert.ok(failure);
+    assert.match(failure, /errorMessage/);
+    assert.match(failure, /codec failed/);
+    assert.match(failure, /speech text omitted/);
+    assert.match(failure, /Bearer \[redacted\]/);
+    assert.match(failure, /\[path omitted\]/);
+    assert.doesNotMatch(failure, /Titkos felolvasandó mondat|secret-token|model\.bin/);
+    assert.equal(jobs.poll(job.jobId, spokenText, "hu")?.status, "failed");
+  } finally {
+    console.info = originalInfo;
+  }
+});
+
 test("job IDs are bound to text and queue size is bounded", async () => {
   const engine = new FakeEngine(); const jobs = new VoiceJobs(engine);
   const job = jobs.submit("A válasz.", "hu");

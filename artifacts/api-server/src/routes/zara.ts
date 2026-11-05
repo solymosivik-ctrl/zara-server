@@ -7,6 +7,7 @@ import { ZaraSpeakBody } from "@workspace/api-zod";
 import { LocalVoiceEngine } from "../voice/engine";
 import { VoiceJobs } from "../voice/jobs";
 import { toLegacySpeakResponse } from "../voice/legacy-speak-response";
+import { extractWeatherPlace } from "./weather-place";
 
 const router: IRouter = Router();
 export const zaraVoiceJobs = new VoiceJobs(new LocalVoiceEngine());
@@ -150,24 +151,6 @@ function weatherPlaceLabel(name: string): string {
     return "A jelenlegi helyeden";
   }
   return placeName;
-}
-
-function extractWeatherPlace(query: string): string | null {
-  let place = query
-    .replace(/[?!.,;:]+/g, " ")
-    .replace(/(?<![\p{L}\p{N}])holnap[\p{L}\p{N}]*/giu, " ")
-    .replace(
-      /(?<![\p{L}\p{N}])(?:milyen|milyen az|mi(?:lyen)?|nézd meg|nézd|mutasd meg|mondd meg|kérlek|kérlek szépen|hogy|az időjárás|az időjárást|időjárás|időjárást|időjárási|idő|ido|hőmérséklet|homerseklet|hőfok|hofok|fok|eső|szél|van|lesz|várható|holnap|most|ma|jelenleg|hány|hany|mennyi|ott|itt|az adott helyen|ezen a helyen|a nap folyamán|a|az|nap|folyamán|folyaman|során|soran|napon|napra|nál|nálam)(?![\p{L}\p{N}])/giu,
-      " ",
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!place || place.length < 2) {
-    place = "Budapest";
-  }
-
-  return place;
 }
 
 function weatherPlaceCandidates(place: string): string[] {
