@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { tts as generateEdgeTts } from "edge-tts";
+import { extractWeatherPlace, findExactWeatherPlace } from "./weather-place";
 
 const router: IRouter = Router();
 const connectors = new ReplitConnectors();
@@ -155,24 +156,6 @@ function weatherPlaceLabel(name: string): string {
   return placeName;
 }
 
-function extractWeatherPlace(query: string): string | null {
-  let place = query
-    .replace(/[?!.,;:]+/g, " ")
-    .replace(/(?<![\p{L}\p{N}])holnap[\p{L}\p{N}]*/giu, " ")
-    .replace(
-      /(?<![\p{L}\p{N}])(?:milyen|milyen az|mi(?:lyen)?|nézd meg|nézd|mutasd meg|mondd meg|kérlek|kérlek szépen|hogy|az időjárás|az időjárást|időjárás|időjárást|időjárási|idő|ido|hőmérséklet|homerseklet|hőfok|hofok|fok|eső|szél|van|lesz|várható|holnap|most|ma|jelenleg|hány|hany|mennyi|ott|itt|az adott helyen|ezen a helyen|a nap folyamán|a|az|nap|folyamán|folyaman|során|soran|napon|napra|nál|nálam)(?![\p{L}\p{N}])/giu,
-      " ",
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!place || place.length < 2) {
-    place = "Budapest";
-  }
-
-  return place;
-}
-
 function weatherPlaceCandidates(place: string): string[] {
   const candidates = new Set<string>([place]);
   const words = place.split(/\s+/);
@@ -299,14 +282,7 @@ async function resolveWeatherLocation(body: ZaraWeatherRequest): Promise<Weather
     const geocoding = await fetchOpenMeteo<OpenMeteoGeocoding>(
       geocodingUrl.toString(),
     );
-    const result =
-      geocoding.results?.find(
-        (item) =>
-          typeof item.name === "string" &&
-          normalizePlaceName(item.name) === normalizePlaceName(candidate),
-      ) ??
-      geocoding.results?.find((item) => item.country_code === "HU") ??
-      geocoding.results?.[0];
+    const result = findExactWeatherPlace(geocoding.results, candidate);
     if (
       result &&
       typeof result.name === "string" &&
@@ -334,15 +310,6 @@ function normalizeWeatherQuery(value: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizePlaceName(value: string): string {
-  return value
-    .toLocaleLowerCase("hu-HU")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
