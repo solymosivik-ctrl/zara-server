@@ -5,6 +5,13 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { tts as generateEdgeTts } from "edge-tts";
+import { extractWeatherPlace, findExactWeatherPlace } from "./weather-place";
+import {
+  fetchOpenMeteoForecast,
+  fetchOpenMeteoGeocoding,
+  WeatherProviderError,
+  weatherProviderUserMessage,
+} from "./weather-provider";
 
 const router: IRouter = Router();
 const connectors = new ReplitConnectors();
@@ -123,18 +130,6 @@ type OpenMeteoGeocoding = {
   }>;
 };
 
-class WeatherProviderError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly providerMessage: string,
-    readonly safeUrl: string,
-  ) {
-    super(message);
-    this.name = "WeatherProviderError";
-  }
-}
-
 function weatherCondition(code: number): string {
   if (code === 0) return "derült lesz az ég";
   if ([1, 2, 3].includes(code)) return "részben felhős lesz az ég";
@@ -153,24 +148,6 @@ function weatherPlaceLabel(name: string): string {
     return "A jelenlegi helyeden";
   }
   return placeName;
-}
-
-function extractWeatherPlace(query: string): string | null {
-  let place = query
-    .replace(/[?!.,;:]+/g, " ")
-    .replace(/(?<![\p{L}\p{N}])holnap[\p{L}\p{N}]*/giu, " ")
-    .replace(
-      /(?<![\p{L}\p{N}])(?:milyen|milyen az|mi(?:lyen)?|nézd meg|nézd|mutasd meg|mondd meg|kérlek|kérlek szépen|hogy|az időjárás|az időjárást|időjárás|időjárást|időjárási|idő|ido|hőmérséklet|homerseklet|hőfok|hofok|fok|eső|szél|van|lesz|várható|holnap|most|ma|jelenleg|hány|hany|mennyi|ott|itt|az adott helyen|ezen a helyen|a nap folyamán|a|az|nap|folyamán|folyaman|során|soran|napon|napra|nál|nálam)(?![\p{L}\p{N}])/giu,
-      " ",
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!place || place.length < 2) {
-    place = "Budapest";
-  }
-
-  return place;
 }
 
 function weatherPlaceCandidates(place: string): string[] {
@@ -214,47 +191,6 @@ function weatherPlaceCandidates(place: string): string[] {
   return [...candidates];
 }
 
-async function fetchOpenMeteo<T>(url: string): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12_000);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    const responseText = await response.text();
-    const safeUrl = new URL(url);
-    safeUrl.searchParams.delete("apikey");
-    let payload: unknown = responseText;
-    try {
-      payload = responseText ? JSON.parse(responseText) : null;
-    } catch {
-      // Keep the raw provider body in the diagnostic message.
-    }
-    if (!response.ok) {
-      const providerMessage =
-        payload && typeof payload === "object" && "reason" in payload &&
-        typeof payload.reason === "string"
-          ? payload.reason
-          : responseText.slice(0, 500);
-      throw new WeatherProviderError(
-        `Open-Meteo HTTP ${response.status} ${response.statusText}: ${providerMessage}`,
-        response.status,
-        providerMessage,
-        safeUrl.toString(),
-      );
-    }
-    if (payload === null || typeof payload !== "object") {
-      throw new WeatherProviderError(
-        "Open-Meteo returned an invalid JSON response.",
-        response.status,
-        responseText.slice(0, 500),
-        safeUrl.toString(),
-      );
-    }
-    return payload as T;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function resolveWeatherLocation(body: ZaraWeatherRequest): Promise<WeatherLocation> {
   const hasLatitude = typeof body.latitude === "number";
   const hasLongitude = typeof body.longitude === "number";
@@ -296,17 +232,10 @@ async function resolveWeatherLocation(body: ZaraWeatherRequest): Promise<Weather
     geocodingUrl.searchParams.set("format", "json");
     const apiKey = process.env["OPEN_METEO_API_KEY"]?.trim();
     if (apiKey) geocodingUrl.searchParams.set("apikey", apiKey);
-    const geocoding = await fetchOpenMeteo<OpenMeteoGeocoding>(
+    const geocoding = await fetchOpenMeteoGeocoding<OpenMeteoGeocoding>(
       geocodingUrl.toString(),
     );
-    const result =
-      geocoding.results?.find(
-        (item) =>
-          typeof item.name === "string" &&
-          normalizePlaceName(item.name) === normalizePlaceName(candidate),
-      ) ??
-      geocoding.results?.find((item) => item.country_code === "HU") ??
-      geocoding.results?.[0];
+    const result = findExactWeatherPlace(geocoding.results, candidate);
     if (
       result &&
       typeof result.name === "string" &&
@@ -334,15 +263,6 @@ function normalizeWeatherQuery(value: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizePlaceName(value: string): string {
-  return value
-    .toLocaleLowerCase("hu-HU")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
@@ -377,7 +297,9 @@ async function getWeatherReport(body: ZaraWeatherRequest): Promise<WeatherReport
   forecastUrl.searchParams.set("timezone", "auto");
   const apiKey = process.env["OPEN_METEO_API_KEY"]?.trim();
   if (apiKey) forecastUrl.searchParams.set("apikey", apiKey);
-  const forecast = await fetchOpenMeteo<OpenMeteoForecast>(forecastUrl.toString());
+  const forecast = await fetchOpenMeteoForecast<OpenMeteoForecast>(
+    forecastUrl.toString(),
+  );
   const current = forecast.current;
   const daily = forecast.daily;
   if (
@@ -620,9 +542,7 @@ router.post("/zara/chat", async (req, res) => {
           },
           "Weather provider request failed during chat fallback prevention",
         );
-        res.status(502).json({
-          message: `Az időjárási szolgáltató hibát adott (HTTP ${error.status}): ${error.providerMessage}`,
-        });
+        res.status(502).json({ message: weatherProviderUserMessage(error) });
       } else {
         req.log.warn(
           { err: error, query: latestUserMessage.content },
@@ -764,7 +684,7 @@ router.post("/zara/weather", async (req, res) => {
       message: isClientError
         ? message
         : error instanceof WeatherProviderError
-          ? `Az időjárási szolgáltató hibát adott (HTTP ${error.status}): ${error.providerMessage}`
+          ? weatherProviderUserMessage(error)
           : "Nem sikerült elérni az aktuális időjárási szolgáltatást. Ellenőrizd a fejlesztői naplót a pontos hibáért.",
     });
   }
