@@ -9,7 +9,8 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:repair": "node ./scripts/run-repair-tests.mjs",
-    "test": "pnpm run test:repair"
+    "test:weather": "node ./scripts/run-weather-tests.mjs",
+    "test": "pnpm run test:repair && pnpm run test:weather"
   },
   "dependencies": {
     "@replit/connectors-sdk": "^0.4.1",
